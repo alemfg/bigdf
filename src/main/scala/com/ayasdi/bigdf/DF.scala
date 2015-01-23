@@ -4,7 +4,6 @@
  *         big dataframe on spark
  */
 package com.ayasdi.bigdf
-import org.apache.commons.csv._
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
@@ -658,19 +657,6 @@ object DF {
    * @param fasterGuess Just use true unless you are having trouble
    */
   def apply(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean): DF = {
-    val df: DF = DF(sc, "inFile")
-    df.defaultStorageLevel = MEMORY_ONLY_SER //FIXME: allow changing this
-    val csvFormat = CSVFormat.DEFAULT.withDelimiter(separator).withIgnoreSurroundingSpaces(true)
-    val file = sc.textFile(inFile)
-    val firstLine = file.first
-    val header = CSVParser.parse(firstLine, csvFormat).iterator.next
-    println(s"Found ${header.size} columns")
-    df.addHeader(JavaConversions.asScalaIterator(header.iterator))
-
-    val dataLines = file.mapPartitionsWithIndex({
-      case (partitionIndex, iter) => if (partitionIndex == 0) iter.drop(1) else iter
-    }, true)
-    dataLines.setName(s"data/$inFile")
 
     /*
      * guess the type of a column by looking at a random sample
@@ -695,7 +681,7 @@ object DF {
      * guess the type of a column by looking at the firt few rows (for now 5)
      * only materializes the first few rows of first partition, hence faster
      */
-    def guessTypeByFirstFew(col: RDD[String]) = {
+    def guessTypeByFirstFew(col: Array[String]) = {
       val samples = col.take(5)
       val parseFailCount = samples.filter { str =>
         Try {
@@ -728,19 +714,48 @@ object DF {
         ru.typeOf[Double]
     }
 
-    val rows = dataLines.map {
-      CSVParser.parse(_, csvFormat).iterator.next
-    }.persist(df.defaultStorageLevel).setName(s"csvRecord/$inFile")
+    val df: DF = DF(sc, "inFile")
+    df.defaultStorageLevel = MEMORY_ONLY_SER //FIXME: allow changing this
+    val file = sc.textFile(inFile)
+
+    // parse header line
+    val firstLine = file.first
+    val header = new CsvFile(None, separator, "\n", true, 0).parseLineSlow(firstLine)
+    println(s"Found ${header.size} columns in header")
+    df.addHeader(header)
+
+    // parse data lines
+    val dataLines = file.mapPartitionsWithIndex({
+      case (partitionIndex, iter) => if (partitionIndex == 0) iter.drop(1) else iter
+    }, true)
+    dataLines.setName(s"data/$inFile")
+
+    println(s"---${dataLines.partitions.length}")
+    
+    val rows = dataLines.mapPartitionsWithIndex({
+      case (split, iter) => {
+        println(s"*** $split")
+        val parser = new CsvFile(Some(iter), separator, "\n", true, split)
+        parser
+//        iter.map {
+//          parser.parseLine(_)
+//        }
+      }
+    }, true).persist(df.defaultStorageLevel)
 
     val columns = for (i <- 0 until df.columnCount) yield {
-      rows.map {
-        _.get(i)
-      }.persist(df.defaultStorageLevel)
+      rows.map { row => row(i)}
+        .persist(df.defaultStorageLevel)
     }
 
     var i = 0
+    val firstFewRows = if(fasterGuess) rows.take(5) else null
     columns.foreach { col =>
-      val t = if (fasterGuess) guessTypeByFirstFew(columns(i)) else guessType(columns(i))
+      val t = if (fasterGuess) {
+        guessTypeByFirstFew(firstFewRows.map { row => row(i)})
+      } else {
+        guessType(columns(i))
+      }
       col.setName(s"$t/$inFile/${df.colIndexToName(i)}")
       println(s"Column: ${df.colIndexToName(i)} \t\t\tGuessed Type: ${t}")
       if (t == ru.typeOf[Double]) {
