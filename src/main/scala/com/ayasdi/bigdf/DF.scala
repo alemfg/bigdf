@@ -720,7 +720,7 @@ object DF {
 
     // parse header line
     val firstLine = file.first
-    val header = new CsvFile(None, separator, "\n", true, 0).parseLineSlow(firstLine)
+    val header = new CsvFile(None, separator, true, 0).parseLineSlow(firstLine)
     println(s"Found ${header.size} columns in header")
     df.addHeader(header)
 
@@ -729,17 +729,11 @@ object DF {
       case (partitionIndex, iter) => if (partitionIndex == 0) iter.drop(1) else iter
     }, true)
     dataLines.setName(s"data/$inFile")
-
-    println(s"---${dataLines.partitions.length}")
     
     val rows = dataLines.mapPartitionsWithIndex({
       case (split, iter) => {
-        println(s"*** $split")
-        val parser = new CsvFile(Some(iter), separator, "\n", true, split)
+        val parser = new CsvFile(Some(iter), separator, true, split)
         parser
-//        iter.map {
-//          parser.parseLine(_)
-//        }
       }
     }, true).persist(df.defaultStorageLevel)
 

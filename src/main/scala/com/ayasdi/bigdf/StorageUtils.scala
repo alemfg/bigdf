@@ -9,13 +9,14 @@ import com.univocity.parsers.csv._
 import java.io.StringReader
 import java.io.IOException
 
-class CsvFile(iter: Option[Iterator[String]], fieldSep: Char, lineSep: String, ignoreSpace: Boolean, split: Int)
+class CsvFile(iter: Option[Iterator[String]], fieldSep: Char, ignoreSpace: Boolean, split: Int)
   extends Iterator[Array[String]] {
-
+  val lineSep = "\n"
+  
   val reader = if(iter.isEmpty)
     new ReusableStringReader("")
   else 
-    new RDDStringReader(iter.get)
+    new StringIteratorReader(iter.get, lineSep)
   
   val parser = getParser(fieldSep, lineSep, ignoreSpace)
   parser.beginParsing(reader)
@@ -29,26 +30,19 @@ class CsvFile(iter: Option[Iterator[String]], fieldSep: Char, lineSep: String, i
     settings.setIgnoreLeadingWhitespaces(ignoreSpace)
     settings.setIgnoreTrailingWhitespaces(ignoreSpace)
     settings.setReadInputOnSeparateThread(false)
+    settings.setInputBufferSize(100)
    
     new CsvParser(settings)
   }
 
-  def parseLine(line: String): Array[String] = {
-    //    reader.setString(line)
-    //
-    val parsed = parser.parseNext()
-    // parser.stopParsing()
-    parsed
-  }
-
   def next = {
-    println(s"***${split} / ${nextRecord(0)} ${nextRecord(1)} ${nextRecord(3)} ***")
+//    println(s"***${split} / ${nextRecord(0)} ${nextRecord(1)} ${nextRecord(3)} ***")
     val curRecord = nextRecord
     if(curRecord != null) 
       nextRecord = parser.parseNext()
     else
       throw new NoSuchElementException("next record is null")
-    if(nextRecord != null) println(s"*** ${nextRecord(3)} ***")
+//    if(nextRecord != null) println(s"*** ${nextRecord(3)} ***")
     curRecord
   }
   
@@ -151,22 +145,21 @@ class ReusableStringReader(var str: String) extends java.io.Reader {
  * Inspired by java.io.StringReader
  * @param iter iterator over RDD[String]
  */
-class RDDStringReader(val iter: Iterator[String]) extends java.io.Reader {
+class StringIteratorReader(val iter: Iterator[String], val lineSep: String) extends java.io.Reader {
+  require(lineSep.length == 1)
   private var next: Long = 0
   private var length: Long = 0
   private var start: Long = 0
   private var str: String = null
+  private val lineSepLen = lineSep.length
 
   private def refill(): Unit = {
     if(length == next) {
       if(iter.hasNext) {
-//        str = iter.next + "\n"
         str = iter.next
         start = length
-        length += (str.length + 1) //+ 1 for the missing \n
-//        start = length
-//        length += str.length
-        println(s"*** ${str} start=$start next=$next length=$length")
+        length += (str.length + lineSepLen) //allowance for line separator removed by SparkContext.textFile()
+//        println(s"*** ${str} start=$start next=$next length=$length")
       } else {
         str = null
       }
@@ -196,24 +189,25 @@ class RDDStringReader(val iter: Iterator[String]) extends java.io.Reader {
     } else if (len == 0) {
       n = 0
     }
-    if (next >= length) {
-      n = -1
-    } else {
-      n = Math.min(length - next, len).toInt
-      if (next + n - start == str.length) {
-        str.getChars((next - start).toInt, (next + n - start).toInt, cbuf, off)
+    else {
+      if (next >= length) {
+        n = -1
       } else {
-        str.getChars((next - start).toInt, (next + n - start - 1).toInt, cbuf, off)
-        cbuf(off + n - 1) = '\n'
-      }
-      next += n
-      var eof = false
-      while (n < len && !eof) {
-        val m = read(cbuf, off + n, len - n)
-        if(m != -1)
-          n += m
-        else
-          eof = true
+        n = Math.min(length - next, len).toInt
+        if (n == length - next) {
+          str.getChars((next - start).toInt, (next - start + n - 1).toInt, cbuf, off)
+          cbuf(off + n - lineSepLen) = lineSep.charAt(0)
+        } else {
+          str.getChars((next - start).toInt, (next - start + n).toInt, cbuf, off)
+        }
+        next += n
+        if (n < len) {
+       //   println(s"n=$n next=$next off=$off, len=$len, length=$length, start=$start")
+          val m = read(cbuf, off + n, len - n)
+          if(m != -1)
+            n += m
+       //   println(s"m=$m n=$n")
+        }
       }
     }
 

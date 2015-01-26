@@ -86,4 +86,27 @@ private[bigdf] object ColumnZipper {
     first.zip(rest)
   }
 
+  /**
+   * zip columns to get rows as arrays
+   * @param cols
+   * @return RDD of columns zipped into Arrays
+   */
+  def zip2(cols: Seq[Column[Any]]): RDD[Seq[Any]] = {
+    val first = cols.head.rdd
+    val rest = cols.tail.map {
+      _.rdd
+    }
+
+    //if you get a compile error here, you have the wrong spark
+    //get my forked version or patch yours from my pull request
+    //https://github.com/apache/spark/pull/2429
+    first.zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
+      new Iterator[Seq[Any]] {
+        def hasNext = !iterSeq.exists(! _.hasNext)
+        def next = iterSeq.map { iter => iter.next }
+      }
+    }
+
+  }
+  
 }

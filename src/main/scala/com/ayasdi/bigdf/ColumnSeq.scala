@@ -35,7 +35,27 @@ case class ColumnSeq(val cols: Seq[(String, Column[Any])]) {
     val zippedCols = ColumnZipper(cols.map {
       _._2
     })
-    val mapped = zippedCols.map { row => mapper(row)}
+    val mapped = zippedCols.map { row => mapper(row) }
+    if (tpe == classTag[Double])
+      Column(sc, mapped.asInstanceOf[RDD[Double]])
+    else if (tpe == classTag[String])
+      Column(sc, mapped.asInstanceOf[RDD[String]])
+    else
+      null
+  }
+
+  /**
+   * apply a function to some columns to produce a new column
+   * @param mapper the function to be applied
+   * @tparam U  return type of the function
+   * @return  a new column
+   */
+  def map2[U: ClassTag](mapper: Seq[Any] => U): Column[Any] = {
+    val tpe = classTag[U]
+    val zippedCols = ColumnZipper(cols.map {
+      _._2
+    })
+    val mapped = zippedCols.map { row => mapper(row) }
     if (tpe == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
     else if (tpe == classTag[String])
