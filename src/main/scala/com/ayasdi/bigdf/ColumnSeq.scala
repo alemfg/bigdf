@@ -50,12 +50,9 @@ case class ColumnSeq(val cols: Seq[(String, Column[Any])]) {
    * @tparam U  return type of the function
    * @return  a new column
    */
-  def map2[U: ClassTag](mapper: Seq[Any] => U): Column[Any] = {
+  def map2[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
     val tpe = classTag[U]
-    val zippedCols = ColumnZipper(cols.map {
-      _._2
-    })
-    val mapped = zippedCols.map { row => mapper(row) }
+    val mapped = ColumnZipper.zip2(cols.map {_._2}) { row => mapper(row) }
     if (tpe == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
     else if (tpe == classTag[String])

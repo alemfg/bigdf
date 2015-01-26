@@ -6,6 +6,7 @@
 package com.ayasdi.bigdf
 
 import org.apache.spark.rdd.RDD
+import scala.reflect.{ClassTag, classTag}
 
 private[bigdf] object CountHelper {
   def countNaN(row: Array[Any]) = {
@@ -91,7 +92,7 @@ private[bigdf] object ColumnZipper {
    * @param cols
    * @return RDD of columns zipped into Arrays
    */
-  def zip2(cols: Seq[Column[Any]]): RDD[Seq[Any]] = {
+  def zip2[U: ClassTag](cols: Seq[Column[Any]])(mapper: Array[Any] => U): RDD[U] = {
     val first = cols.head.rdd
     val rest = cols.tail.map {
       _.rdd
@@ -101,9 +102,18 @@ private[bigdf] object ColumnZipper {
     //get my forked version or patch yours from my pull request
     //https://github.com/apache/spark/pull/2429
     first.zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
-      new Iterator[Seq[Any]] {
-        def hasNext = !iterSeq.exists(! _.hasNext)
-        def next = iterSeq.map { iter => iter.next }
+      val temp = new Array[Any](iterSeq.length)
+      new Iterator[U] {
+        def hasNext = !iterSeq.exists(!_.hasNext)
+
+        def next = {
+          var i = 0
+          iterSeq.foreach { iter =>
+            temp(i) = iter.next
+            i += 1
+          }
+          mapper(temp)
+        }
       }
     }
 

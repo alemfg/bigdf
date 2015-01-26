@@ -315,12 +315,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         df("new") = df("a", "b").map(TestFunctions.summer)
         assert(df("new").doubleRdd.first === 21 + 11)
     }
-//
-//    test("Column Ops: New column as custom function of existing ones") {
-//        val df = makeDF
-//        df("new") = df("a", "b").map2(TestFunctions2.summer)
-//        assert(df("new").doubleRdd.first === 21 + 11)
-//    }
+
+    test("Column Ops: New column as custom function of existing ones - faster?") {
+        val df = makeDF
+        df("new") = df("a", "b").map2(TestFunctions2.summer)
+        assert(df("new").doubleRdd.first === 21 + 11)
+    }
 
     test("Aggregate") {
         val df = makeDF
@@ -401,10 +401,9 @@ case object TestFunctions {
 }
 
 case object TestFunctions2 {
-    def summer(cols: Seq[Any]) = {
-        (cols(0), cols(1)) match {
-            case (a: Double, b: Double) => a + b
-        }
+    def summer(cols: Array[Any]) = {
+        println(cols(0), cols(1))
+        cols(0).asInstanceOf[Double] + cols(1).asInstanceOf[Double]
     }
 }
 
