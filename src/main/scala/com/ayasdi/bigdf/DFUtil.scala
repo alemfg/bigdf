@@ -81,16 +81,13 @@ private[bigdf] object ColumnZipper {
       _.rdd
     }
 
-    //if you get a compile error here, you have the wrong spark
-    //get my forked version or patch yours from my pull request
-    //https://github.com/apache/spark/pull/2429
-    first.zip(rest)
+    import org.apache.spark.ZipImplicits._
+
+    RDDtoZipRDDFunctions(first).zip(rest)
   }
 
   /**
-   * zip columns to get rows as arrays
-   * @param cols
-   * @return RDD of columns zipped into Arrays
+   * zip columns and apply mapper to zipped object
    */
   def zip2[U: ClassTag](cols: Seq[Column[Any]])(mapper: Array[Any] => U): RDD[U] = {
     val first = cols.head.rdd
@@ -98,10 +95,8 @@ private[bigdf] object ColumnZipper {
       _.rdd
     }
 
-    //if you get a compile error here, you have the wrong spark
-    //get my forked version or patch yours from my pull request
-    //https://github.com/apache/spark/pull/2429
-    first.zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
+    import org.apache.spark.ZipImplicits._
+    RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
       val temp = new Array[Any](iterSeq.length)
       new Iterator[U] {
         def hasNext = !iterSeq.exists(!_.hasNext)

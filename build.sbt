@@ -15,7 +15,8 @@ libraryDependencies  ++= Seq(
 	    "com.quantifind" %% "sumac" % "0.3.0",
 	    "org.scalatest" % "scalatest_2.10" % "2.0" % "test",
 	    "org.apache.commons" % "commons-csv" % "1.0",
-      "com.univocity" % "univocity-parsers" % "1.3.1"
+      "com.univocity" % "univocity-parsers" % "1.3.1",
+      "org.apache.spark" %% "spark-core" % "1.2.0"
 )
 
 resolvers ++= Seq(
