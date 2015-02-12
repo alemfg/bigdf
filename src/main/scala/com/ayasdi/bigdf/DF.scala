@@ -201,6 +201,7 @@ case class DF private(val sc: SparkContext,
    * more efficient if there are a lot of columns
    */
   private def filterColumnStrategy(cond: Predicate) = {
+    println (cond)
     val zippedColRdd = ColumnZipper(this, cond.colSeq)
     val colMap = new HashMap[Int, Int] //FIXME: switch to a fast map here
     var i = 0

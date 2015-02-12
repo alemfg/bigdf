@@ -15,18 +15,49 @@ case class PyDF(df: DF) {
     def list = df.list   
     def describe = df.describe
     
-    def where(columnName: String, operator: String, value: Double) : PyDF = {
-       val filter = operator match {
-         case "==" => df(columnName) == value
-         
-         case "!=" => df(columnName) != value
-       }
-       PyDF(df.where(filter))
+    def where(predicate: PyPredicate) : PyDF = {
+      PyDF(df.where(predicate.p))
     }
+    
+//    def where(columnName: String, operator: String, value: Double) : PyDF = {
+//       val filter = operator match {
+//         case "==" => df(columnName) == value
+//         case "!=" => df(columnName) != value
+////         case "<"  => df(columnName) < value
+////         case "<=" => df(columnName) <= value
+////         case ">"  => df(columnName) > value
+////         case ">=" => df(columnName) >= value
+//       }
+//       PyDF(df.where(filter))
+//    }
 }
 
 case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
     def list(numRows: Int) = col.list(numRows)
+}
+
+case class PyPredicate(p : Predicate) {
+    def And(that: PyPredicate) = {
+        PyPredicate(this.p && that.p)
+    }
+    
+    def Or(that: PyPredicate) = {
+        PyPredicate(this.p || that.p)
+    }
+    
+    def Not() = {
+        PyPredicate(!this.p)
+    }
+}
+
+object PyPredicate {
+     def where[T](column: PyColumn[T], operator: String, value: Double) : PyPredicate = {
+       val filter = operator match {
+         case "==" => column.col == value
+         case "!=" => column.col != value
+       }
+       PyPredicate(filter)
+    }
 }
 
 object PyDF {
