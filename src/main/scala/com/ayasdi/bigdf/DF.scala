@@ -720,7 +720,7 @@ object DF {
 
     // parse header line
     val firstLine = file.first
-    val header = new CsvFile(None, separator, true, 0).parseLineSlow(firstLine)
+    val header = new LineCsvParser(separator).parseLine(firstLine)
     println(s"Found ${header.size} columns in header")
     df.addHeader(header)
 
@@ -729,16 +729,15 @@ object DF {
       case (partitionIndex, iter) => if (partitionIndex == 0) iter.drop(1) else iter
     }, true)
     dataLines.setName(s"data/$inFile")
-    
+
     val rows = dataLines.mapPartitionsWithIndex({
       case (split, iter) => {
-        val parser = new CsvFile(Some(iter), separator, true, split)
-        parser
+        new BulkCsvParser(iter, split, separator)
       }
     }, true).persist(df.defaultStorageLevel)
 
     val columns = for (i <- 0 until df.columnCount) yield {
-      rows.map { row => row(i)}
+      rows.map { row => row(i) }
         .persist(df.defaultStorageLevel)
     }
 
@@ -746,7 +745,7 @@ object DF {
     val firstFewRows = if(fasterGuess) rows.take(5) else null
     columns.foreach { col =>
       val t = if (fasterGuess) {
-        guessTypeByFirstFew(firstFewRows.map { row => row(i)})
+        guessTypeByFirstFew(firstFewRows.map { row => row(i) })
       } else {
         guessType(columns(i))
       }
