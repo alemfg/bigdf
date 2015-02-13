@@ -22,6 +22,15 @@ case class PyDF(df: DF) {
   def where(predicate: PyPredicate): PyDF = {
     PyDF(df(predicate.p))
   }
+  
+  def aggregate(byColumn: String, aggrColumn: String, aggregator: String) : PyDF = {
+    val dfAgg = aggregator match {
+      case "Mean" => df.aggregate(byColumn, aggrColumn, AggMean)
+      case "StrJoin" => df.aggregate(byColumn, aggrColumn, new AggMakeString(","))
+      case _ => null
+    }
+    PyDF(dfAgg)
+  }
 }
 
 object PyDF {
