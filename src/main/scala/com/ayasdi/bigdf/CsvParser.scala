@@ -21,6 +21,7 @@ abstract class BaseCsvParser(fieldSep: Char, ignoreSpace: Boolean) {
     settings.setIgnoreTrailingWhitespaces(ignoreSpace)
     settings.setReadInputOnSeparateThread(false)
     settings.setInputBufferSize(100) //FIXME: tune the size of this buffer
+    settings.setMaxColumns(20480)
 
     new CsvParser(settings)
   }
