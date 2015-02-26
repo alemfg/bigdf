@@ -40,9 +40,12 @@ object PyDF {
   }
 }
 
-
 case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   def list(numRows: Int) = col.list(numRows)
+  override def toString = {
+    val name = s"${col.rdd.name}".split('/').last.split('.').head
+    s"$name\t${col.colType}"
+  }
 }
 
 case class PyPredicate(p: Predicate) {
