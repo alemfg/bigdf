@@ -261,7 +261,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         df = makeDFWithNAs
         df("cat_a") = df("a").asCategorical
         df("cat_a").markNACategory(0)
-        df.list
+        df.list()
         assert(df("cat_a").hasNA)
     }
     
@@ -348,9 +348,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     test("Pivot") {
         val df = makeDFFromCSVFile("src/test/resources/pivot.csv")
+        df.list()
         val df2 = df.pivot("Customer", "Period")
         df2.describe
-        df2.list
+        df2.list()
         assert(df2.rowCount === 3)
         assert(df2.columnCount === 6)
         val df3 = df2("S_Customer@Period==2.0").stringRdd.zip(df2("S_Customer@Period==1.0").stringRdd)

@@ -155,6 +155,34 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   }
 
   /**
+   * get the upto max entries in the column as strings
+   */
+  def head(max: Int): Array[String] = {
+    colType match {
+      case ColType.Double => {
+        if (count <= max)
+          doubleRdd.collect
+        else
+          doubleRdd.take(max)
+      }.map { _.toString }
+        
+      case ColType.String => {
+          if (count <= max)
+            stringRdd.collect
+          else
+            stringRdd.take(max)
+      }
+        
+      case _ => {
+        if (count <= max)
+          rdd.collect
+        else
+          rdd.take(max)
+      }.map { _.toString }
+    }
+  }
+
+  /**
    * print upto max(default 10) elements
    */
   def list(max: Int = 10): Unit = {

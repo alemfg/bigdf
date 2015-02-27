@@ -52,7 +52,7 @@ case class ColumnSeq(val cols: Seq[(String, Column[Any])]) {
    */
   def map2[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
     val tpe = classTag[U]
-    val mapped = ColumnZipper.zip2(cols.map {_._2}) { row => mapper(row) }
+    val mapped = ColumnZipper.zipAndMap(cols.map {_._2}) { row => mapper(row) }
     if (tpe == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
     else if (tpe == classTag[String])

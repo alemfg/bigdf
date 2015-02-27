@@ -517,7 +517,7 @@ case class DF private(val sc: SparkContext,
           case ColType.Double => {
             val newColRdd = grpSplit.map {
               case (k, v) =>
-                if (v.isEmpty) Double.NaN else v.head(pivotedColIndex)
+                if (v.isEmpty) Double.NaN else v.head(pivotedColIndex).asInstanceOf[Double]
             }
             newDf.update(s"D_${colIndexToName(pivotedColIndex)}@$pivotByCol==$pivotValue",
               Column(sc, newColRdd.asInstanceOf[RDD[Double]]))
@@ -525,7 +525,7 @@ case class DF private(val sc: SparkContext,
           case ColType.String =>  {
             val newColRdd = grpSplit.map {
               case (k, v) =>
-                if (v.isEmpty) "" else v.head(pivotedColIndex)
+                if (v.isEmpty) "" else v.head(pivotedColIndex).asInstanceOf[String]
             }
             newDf.update(s"S_${colIndexToName(pivotedColIndex)}@$pivotByCol==$pivotValue",
               Column(sc, newColRdd.asInstanceOf[RDD[String]]))
@@ -592,20 +592,16 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * print upto 10 x 10 elements of the dataframe
+   * print upto numRows x numCols elements of the dataframe
    */
-  def list {
+  def list(numRows: Int = 10, numCols: Int = 10): Unit = {
     println(s"Dimensions: $rowCount x $columnCount")
-    val someRows = if (rowCount <= 10) rowsRdd.collect else rowsRdd.take(10)
-    def printRow(row: Array[Any]) {
-      val someCols = if (row.length <= 10) row else row.take(10)
-      println(someCols.mkString("\t"))
-    }
-    printRow((0 until columnCount).map {
-      colIndexToName(_)
-    }.toArray)
-    someRows.foreach {
-      printRow _
+    val nRows = Math.min(numRows, rowCount)
+    val nCols = Math.min(numCols, columnCount)
+    val someCols = (0 until nCols).toList.map { colIndex => cols(colIndexToName(colIndex)) }
+    val someRows = someCols.map { col => col.head(nRows.toInt).toList }.transpose
+    someRows.foreach { row =>
+      println(row.mkString("| ","\t", " |"))
     }
   }
 

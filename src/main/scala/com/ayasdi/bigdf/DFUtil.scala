@@ -89,7 +89,7 @@ private[bigdf] object ColumnZipper {
   /**
    * zip columns and apply mapper to zipped object
    */
-  def zip2[U: ClassTag](cols: Seq[Column[Any]])(mapper: Array[Any] => U): RDD[U] = {
+  def zipAndMap[U: ClassTag](cols: Seq[Column[Any]])(mapper: Array[Any] => U): RDD[U] = {
     val first = cols.head.rdd
     val rest = cols.tail.map {
       _.rdd
@@ -111,7 +111,33 @@ private[bigdf] object ColumnZipper {
         }
       }
     }
-
   }
+
+  /**
+   * zip columns and apply mapper to zipped object
+   */
+//  def zipAndForEach[U: ClassTag](cols: Seq[Column[Any]])(rowHandler: Array[Any] => Unit): Unit = {
+//    val first = cols.head.rdd
+//    val rest = cols.tail.map {
+//      _.rdd
+//    }
+//
+//    import org.apache.spark.ZipImplicits._
+//    RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
+//      val temp = new Array[Any](iterSeq.length)
+//      new Iterator[U] {
+//        def hasNext = !iterSeq.exists(!_.hasNext)
+//
+//        def next = {
+//          var i = 0
+//          iterSeq.foreach { iter =>
+//            temp(i) = iter.next
+//            i += 1
+//          }
+//          rowHandler(temp)
+//        }
+//      }
+//    }
+//  }
   
 }

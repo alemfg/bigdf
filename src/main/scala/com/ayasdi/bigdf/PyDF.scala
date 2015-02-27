@@ -15,7 +15,7 @@ case class PyDF(df: DF) {
 
   def column(name: String) = PyColumn(df.column(name))
 
-  def list = df.list
+  def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)
 
   def describe = df.describe
 
