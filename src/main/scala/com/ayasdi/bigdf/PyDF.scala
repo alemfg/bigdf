@@ -5,6 +5,7 @@
  */
 package com.ayasdi.bigdf
 
+import collection.JavaConversions._
 import org.apache.spark.SparkContext
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
@@ -16,8 +17,6 @@ case class PyDF(df: DF) {
   def column(name: String) = PyColumn(df.column(name))
 
   def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)
-
-  def describe = df.describe
 
   def where(predicate: PyPredicate): PyDF = {
     PyDF(df(predicate.p))
@@ -45,6 +44,23 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   override def toString = {
     val name = s"${col.rdd.name}".split('/').last.split('.').head
     s"$name\t${col.colType}"
+  }
+
+  def stats = {
+    col.colType match {
+      case ColType.Double | ColType.Float | ColType.Short =>
+        val rcol: RichColumnDouble = col
+        val stats = rcol.stats
+
+        mapAsJavaMap(Map("min" -> stats.min,
+            "max" -> stats.max,
+            "mean" -> stats.mean,
+            "std" -> stats.stdev,
+            "var" -> stats.variance,
+            "count" -> stats.count
+            ))
+      case _ => null
+    }
   }
 }
 
