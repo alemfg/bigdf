@@ -5,12 +5,10 @@
  */
 package com.ayasdi.bigdf
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER
 
-import scala.collection.JavaConversions
 import scala.collection.mutable.HashMap
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
