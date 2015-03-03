@@ -99,7 +99,7 @@ private[bigdf] object ColumnZipper {
     RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
       val temp = new Array[Any](iterSeq.length)
       new Iterator[U] {
-        def hasNext = !iterSeq.exists(!_.hasNext)
+        def hasNext = !iterSeq.exists(!_.hasNext)  //FIXME: catch exception instead and make this faster
 
         def next = {
           var i = 0

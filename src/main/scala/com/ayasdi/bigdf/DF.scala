@@ -76,8 +76,24 @@ case class DF private(val sc: SparkContext,
     (0 until columnCount).map { colIndex => colIndexToName(colIndex)}.toArray
   }
 
+  def columns(indices: Seq[Int] = 0 until columnCount) = {
+    indices.map { colIndex => cols(colIndexToName(colIndex)) }
+  }
+
   override def toString() = {
     "Silence is golden" //otherwise prints too much stuff
+  }
+
+  /**
+   * convert the DF to an RDD of CSV Strings
+   * @param separator use this separator, default is comma
+   */
+  private[bigdf] def toCSV(separator: String = ",") = {
+    val rows = ColumnZipper.zipAndMap(columns()) { row => row.mkString(separator) }
+    val header = (0 until columnCount).map { colIndex => colIndexToName(colIndex) }
+                                      .mkString(separator)
+    val headerRdd = sc.parallelize(Array(header))
+    headerRdd.union(rows)
   }
 
   /**
@@ -85,9 +101,10 @@ case class DF private(val sc: SparkContext,
    * @param file save DF in this file
    * @param separator use this separator, default is comma
    */
-  def toCSV(file: String, separator: String = ",") = {
-    rowsRdd.map { row => row.mkString(separator) }.saveAsTextFile(file)
+  def writeToCSV(file: String, separator: String = ",") = {
+    toCSV(separator).saveAsTextFile(file)
   }
+
 
   /**
    * get a column identified by name
@@ -581,7 +598,7 @@ case class DF private(val sc: SparkContext,
   /**
    * print brief description of the DF
    */
-  def describe() {
+  def describe(): Unit = {
     cols.foreach {
       case (name, col) =>
         println(s"${name}:")

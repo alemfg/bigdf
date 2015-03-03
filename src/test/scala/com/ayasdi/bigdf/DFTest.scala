@@ -362,12 +362,15 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         }
         assert(bad.value === 0)
     }
-//
-//    test("toCSV") {
-//      val df = makeDF
-//      df.toCSV(file)
-//      assert(Files.exists(Paths.get(file)) === true)
-//    }
+
+    test("toCSV") {
+      val df = makeDF
+      val csvRows = df.toCSV().collect()
+      assert(csvRows(0) === "a,b,c,Date")
+      assert(csvRows(1) === "11.0,21.0,31.0,1.36074391383E12")
+      assert(csvRows(2) === "12.0,22.0,32.0,1.360616948975E12")
+      assert(csvRows(3) === "13.0,23.0,33.0,1.36055080601E12")
+    }
 }
 
 class DFTestWithKryo extends DFTest {
