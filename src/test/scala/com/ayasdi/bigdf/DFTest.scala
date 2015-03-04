@@ -371,6 +371,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       assert(csvRows(2) === "12.0,22.0,32.0,1.360616948975E12")
       assert(csvRows(3) === "13.0,23.0,33.0,1.36055080601E12")
     }
+
+    test("toParquet") {
+      val df = makeDF
+      df.writeToParquet("/tmp/x")
+    }
+
 }
 
 class DFTestWithKryo extends DFTest {

@@ -6,6 +6,8 @@ scalaVersion := "2.10.3"
 
 scalacOptions += "-feature"
 
+parallelExecution in Test := false
+
 libraryDependencies ++= Seq(
   "org.scalanlp" % "breeze-natives_2.10" % "0.7",
   "org.apache.commons" % "commons-math3" % "3.0",

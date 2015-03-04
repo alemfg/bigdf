@@ -9,6 +9,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.types._
 
 import scala.collection.mutable.HashMap
 import scala.reflect.runtime.{universe => ru}
@@ -72,13 +73,13 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
      what is the column type?
    */
   val tpe = ru.typeOf[T]
-  private val isDouble = tpe =:= ru.typeOf[Double]
-  private val isFloat = tpe =:= ru.typeOf[Float]
-  private val isString = tpe =:= ru.typeOf[String]
-  private val isShort = tpe =:= ru.typeOf[Short]
-  private val isArrayOfString = tpe =:= ru.typeOf[Array[String]]
-  private val isArrayOfDouble = tpe =:= ru.typeOf[Array[Double]]
-  private val isMapOfStringToFloat = tpe =:= ru.typeOf[Map[String, Float]]
+  private[bigdf] val isDouble = tpe =:= ru.typeOf[Double]
+  private[bigdf] val isFloat = tpe =:= ru.typeOf[Float]
+  private[bigdf] val isString = tpe =:= ru.typeOf[String]
+  private[bigdf] val isShort = tpe =:= ru.typeOf[Short]
+  private[bigdf] val isArrayOfString = tpe =:= ru.typeOf[Array[String]]
+  private[bigdf] val isArrayOfDouble = tpe =:= ru.typeOf[Array[Double]]
+  private[bigdf] val isMapOfStringToFloat = tpe =:= ru.typeOf[Map[String, Float]]
 
   /*
       use this for demux'ing in column type
@@ -92,6 +93,18 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       else if(isMapOfStringToFloat) ColType.MapOfStringToFloat
       else if(isArrayOfDouble) ColType.ArrayOfDouble
       else ColType.Undefined
+
+  val sqlType: DataType = if(isDouble) DoubleType
+      else if(isFloat) FloatType
+      else if(isShort) ShortType
+      else if(isString) StringType
+      else if(isArrayOfString) ArrayType(StringType)
+      else if(isMapOfStringToFloat) MapType(StringType, FloatType)
+      else if(isArrayOfDouble) ArrayType(DoubleType)
+      else {
+        throw new Exception("Unknown column type")
+        null
+      }
 
   /**
    * Spark uses ClassTag but bigdf uses the more functional TypeTag. This method compares the two.

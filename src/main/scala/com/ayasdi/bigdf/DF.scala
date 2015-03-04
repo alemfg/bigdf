@@ -8,6 +8,8 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER
+import org.apache.spark.sql._
+import org.apache.spark.sql.types._
 
 import scala.collection.mutable.HashMap
 import scala.reflect.runtime.{universe => ru}
@@ -101,8 +103,22 @@ case class DF private(val sc: SparkContext,
    * @param file save DF in this file
    * @param separator use this separator, default is comma
    */
-  def writeToCSV(file: String, separator: String = ",") = {
+  def writeToCSV(file: String, separator: String = ","): Unit = {
     toCSV(separator).saveAsTextFile(file)
+  }
+
+  /**
+   * save the DF to a parquet file
+   * @param file save DF in this file
+   */
+  def writeToParquet(file: String): Unit = {
+    require(columns().forall(col => col.isDouble || col.isString
+                            || col.isFloat || col.isShort)) //TODO: support other types
+
+    val fields = columnNames.map { colName => StructField(colName, cols(colName).sqlType, true) }
+    val rowRdd = ColumnZipper.zipAndMap(columns()) { Row.fromSeq(_) }
+    val rowsSchemaRdd = new SQLContext(sc).applySchema(rowRdd, StructType(fields))
+    rowsSchemaRdd.saveAsParquetFile(file)
   }
 
 
