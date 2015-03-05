@@ -8,35 +8,24 @@ package com.ayasdi.bigdf
 
 import java.nio.file.{Files, Paths}
 
+import com.ayasdi.bigdf.Preamble._
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.SparkContext._
 import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import scala.collection.TraversableOnce.MonadOps
-import Preamble._
 
 class DFTest extends FunSuite with BeforeAndAfterAll {
     implicit var sc: SparkContext = _
     val file: String = "/tmp/test_abcd.csv"
 
-    def fileCleanup: Unit = {
-      try {
-        Files.deleteIfExists(Paths.get(file))
-      } catch {
-        case _: Throwable => println("Exception while deleting temp file")
-      }
-    }
-
     override def beforeAll: Unit = {
         SparkUtil.silenceSpark
         System.clearProperty("spark.master.port")
         sc = new SparkContext("local[4]", "abcd")
-        fileCleanup
     }
 
     override def afterAll: Unit = {
-        fileCleanup
         sc.stop
     }
 
@@ -373,8 +362,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     test("toParquet") {
+      val fileName = "/tmp/x"
       val df = makeDF
-      df.writeToParquet("/tmp/x")
+
+      FileUtils.removeAll(fileName)
+      df.writeToParquet(fileName)
+      assert(true === Files.exists(Paths.get(fileName)))
     }
 
 }

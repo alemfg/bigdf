@@ -5,6 +5,8 @@
  */
 package com.ayasdi.bigdf
 
+import java.io.File
+
 import org.apache.spark.rdd.RDD
 import scala.reflect.{ClassTag, classTag}
 
@@ -140,4 +142,15 @@ private[bigdf] object ColumnZipper {
 //    }
 //  }
   
+}
+
+object FileUtils {
+  def removeAll(path: String) = {
+    def getRecursively(f: File): Seq[File] =
+      f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles ++ List(f)
+
+    getRecursively(new File(path)).foreach{ f =>
+      if (!f.delete())
+        throw new RuntimeException("Failed to delete " + f.getAbsolutePath)}
+  }
 }
