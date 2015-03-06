@@ -233,7 +233,7 @@ case class DF private(val sc: SparkContext,
    */
   private def filterColumnStrategy(cond: Predicate) = {
     println (cond)
-    val zippedColRdd = ColumnZipper(this, cond.colSeq)
+    val zippedColRdd = ColumnZipper.makeRows(this, cond.colSeq)
     val colMap = new HashMap[Int, Int] //FIXME: switch to a fast map here
     var i = 0
     cond.colSeq.foreach { colIndex =>
@@ -364,7 +364,7 @@ case class DF private(val sc: SparkContext,
    * columns are zip'd together to get rows, expensive operation
    */
   private def computeRows: RDD[Array[Any]] = {
-    ColumnZipper(this, (0 until columnCount).toList)
+    ColumnZipper.makeRows(this, (0 until columnCount).toList)
   }
 
   /*
@@ -375,7 +375,7 @@ case class DF private(val sc: SparkContext,
     val columns = colNames.map {
       cols(_).index
     }
-    ColumnZipper(this, columns)
+    ColumnZipper.makeRows(this, columns)
   }.zip(valueRdd)
 
   /**
@@ -483,7 +483,7 @@ case class DF private(val sc: SparkContext,
     val columns = colNames.map {
       cols(_).index
     }
-    ColumnZipper.zip(this, columns)
+    ColumnZipper.makeList(this, columns)
   }.zip(cols(valueCol).rdd)
 
   /**
@@ -861,11 +861,7 @@ object DF {
     val cols = df.cols.clone
     for (i <- 0 until df.columnCount) {
       def applyFilter[T: ClassTag](in: RDD[T]) = {
-        in.zip(filtration).filter {
-          _._2 == true
-        }.map {
-          _._1
-        }
+        ColumnZipper.filterBy(in, filtration)
       }
       val colName = df.colIndexToName(i)
       val col = cols(colName)
