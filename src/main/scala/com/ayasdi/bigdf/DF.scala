@@ -685,63 +685,6 @@ object DF {
    * @param fasterGuess Just use true unless you are having trouble
    */
   def apply(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean): DF = {
-
-    /*
-     * guess the type of a column by looking at a random sample
-     * however, this is slow because spark will cause all data to be
-     * materialized before it can be sampled
-     */
-    def guessTypeByRandomSampling(col: RDD[String]) = {
-      val samples = col.sample(false, 0.01, (new Random).nextLong)
-        .union(sc.parallelize(List(col.first)))
-      val parseFailCount = samples.filter { str =>
-        Try {
-          str.toDouble
-        }.toOption == None
-      }.count
-
-      if (parseFailCount > 0)
-        ru.typeOf[String]
-      else
-        ru.typeOf[Double]
-    }
-    /*
-     * guess the type of a column by looking at the firt few rows (for now 5)
-     * only materializes the first few rows of first partition, hence faster
-     */
-    def guessTypeByFirstFew(col: Array[String]) = {
-      val samples = col.take(5)
-      val parseFailCount = samples.filter { str =>
-        Try {
-          str.toDouble
-        }.toOption == None
-      }.length
-
-      if (parseFailCount > 0)
-        ru.typeOf[String]
-      else
-        ru.typeOf[Double]
-    }
-
-    /*
-     * guess the type of a column by looking at the first element
-     * in every partition. faster than random sampling method
-     */
-    def guessType(col: RDD[String]) = {
-      val parseErrors = sc.accumulator(0)
-      col.foreachPartition { str =>
-        try {
-          val y = if (str.hasNext) str.next.toDouble else 0
-        } catch {
-          case _: java.lang.NumberFormatException => parseErrors += 1
-        }
-      }
-      if (parseErrors.value > 0)
-        ru.typeOf[String]
-      else
-        ru.typeOf[Double]
-    }
-
     val df: DF = DF(sc, "inFile")
     df.defaultStorageLevel = MEMORY_ONLY_SER //FIXME: allow changing this
     val file = sc.textFile(inFile)
@@ -773,9 +716,9 @@ object DF {
     val firstFewRows = if(fasterGuess) rows.take(5) else null
     columns.foreach { col =>
       val t = if (fasterGuess) {
-        guessTypeByFirstFew(firstFewRows.map { row => row(i) })
+        SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) })
       } else {
-        guessType(columns(i))
+        SchemaUtils.guessType(sc, columns(i))
       }
       col.setName(s"$t/$inFile/${df.colIndexToName(i)}")
       println(s"Column: ${df.colIndexToName(i)} \t\t\tGuessed Type: ${t}")
