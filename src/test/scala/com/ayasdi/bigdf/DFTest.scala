@@ -89,6 +89,8 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         assert(colA.rdd.count === 3)
         val col0 = df(0)
         assert((col0 eq colA) === true)
+        val colDotA = df.a
+        assert((colDotA eq colA) === true)
     }
 
     test("Array of column names") {
@@ -276,6 +278,11 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         assert(df("new").doubleRdd.first === aa * bb)
         df("new") = df("a") / df("b")
         assert(df("new").doubleRdd.first === aa / bb)
+
+        df.newCol = df.a + df.b
+        assert(df.newCol.doubleRdd.first === aa + bb)
+        df.newCol = df.a
+        assert(df.newCol.doubleRdd.first === aa)
     }
 
     test("Column Ops: New column as simple function of existing column and scalar") {

@@ -6,15 +6,15 @@
 package com.ayasdi.bigdf
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
-import org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
+import org.apache.spark.storage.StorageLevel
+import org.apache.spark.storage.StorageLevel.MEMORY_ONLY_SER
 
 import scala.collection.mutable.HashMap
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
-import scala.util.{Random, Try}
+import scala.language.dynamics
 
 /**
  * types of joins
@@ -38,7 +38,7 @@ object JoinType extends Enumeration {
 case class DF private(val sc: SparkContext,
                       val cols: HashMap[String, Column[Any]] = new HashMap[String, Column[Any]],
                       val colIndexToName: HashMap[Int, String] = new HashMap[Int, String],
-                      val name: String) {
+                      val name: String) extends Dynamic {
   /**
    * number of rows in df
    * @return number of rows
@@ -159,6 +159,11 @@ case class DF private(val sc: SparkContext,
       columnsByRanges(items.asInstanceOf[Seq[Range]])
     else null
   }
+
+  /**
+   * refer to a column 'c' in DF 'df' as df.c equivalent to df("c")
+   */
+  def selectDynamic(colName: String) = column(colName)
 
   /**
    * get multiple columns identified by names
@@ -599,6 +604,11 @@ case class DF private(val sc: SparkContext,
     rowsRddCached = None //invalidate cached rows
     //FIXME: incremental computation of rows
   }
+
+  /**
+   * update a column "c" of DF "df" like df.c = .. equivalent df("c") = ...
+   */
+  def updateDynamic(colName: String)(that: Column[Any]) = update(colName, that)
 
   /**
    * group by a column, uses a lot of memory. try to use aggregate(By) instead if possible
