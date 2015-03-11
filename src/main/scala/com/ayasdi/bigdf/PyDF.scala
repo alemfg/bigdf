@@ -7,6 +7,7 @@ package com.ayasdi.bigdf
 
 import collection.JavaConversions._
 import org.apache.spark.SparkContext
+import org.apache.spark.api.java.JavaRDD
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 import Preamble._
@@ -20,6 +21,10 @@ case class PyDF(df: DF) {
 
   def where(predicate: PyPredicate): PyDF = {
     PyDF(df(predicate.p))
+  }
+
+  def update(name: String, pycol: PyColumn[_]) = {
+    df.update(name, pycol.col)
   }
   
   def aggregate(byColumn: String, aggrColumn: String, aggregator: String) : PyDF = {
@@ -62,6 +67,31 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
       case _ => null
     }
   }
+  
+  def javaRDD = {
+    JavaRDD.fromRDD(col.rdd)
+  }
+
+  def add(v: Double) = {
+    val rcol : RichColumnDouble = col
+    PyColumn(rcol + v)
+  }
+
+  def sub(v: Double) = {
+    val rcol : RichColumnDouble = col
+    PyColumn(rcol - v)
+  }
+
+  def mul(v: Double) = {
+    val rcol : RichColumnDouble = col
+    PyColumn(rcol * v)
+  }
+
+  def div(v: Double) = {
+    val rcol : RichColumnDouble = col
+    PyColumn(rcol / v)
+  }
+
 }
 
 case class PyPredicate(p: Predicate) {
