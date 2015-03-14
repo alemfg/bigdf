@@ -11,6 +11,9 @@ import org.apache.spark.api.java.JavaRDD
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 import Preamble._
+import org.apache.spark.BigDFPyRDD
+
+
 
 case class PyDF(df: DF) {
   def columnNames = df.columnNames
@@ -67,9 +70,12 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
       case _ => null
     }
   }
-  
-  def javaRDD = {
-    JavaRDD.fromRDD(col.rdd)
+
+  def javaToPython : JavaRDD[Array[Byte]] = {
+    col.colType match {
+      case ColType.Double => BigDFPyRDD.pythonRDD(col.rdd)      
+      case _ => null
+    }
   }
 
   def add(v: Double) = {
