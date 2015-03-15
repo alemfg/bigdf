@@ -6,12 +6,12 @@
 package com.ayasdi.bigdf
 
 import collection.JavaConversions._
+import org.apache.spark.BigDFPyRDD
 import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaRDD
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 import Preamble._
-import org.apache.spark.BigDFPyRDD
 
 
 
@@ -76,6 +76,12 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
       case ColType.Double => BigDFPyRDD.pythonRDD(col.rdd)      
       case _ => null
     }
+  }
+
+  def pythonToJava(c : JavaRDD[Array[Byte]]) = {
+      val jrdd = BigDFPyRDD.javaRDD(c)
+      val newCol = Column(col.sc, jrdd.rdd, 0)
+      PyColumn(newCol)
   }
 
   def add(v: Double) = {
