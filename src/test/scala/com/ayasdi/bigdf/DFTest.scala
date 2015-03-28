@@ -81,6 +81,13 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         assert(df.rowCount === 4)
     }
 
+    test("Construct: DF from directory of CSV files") {
+        val df = makeDFFromCSVFile("src/test/resources/multiFile")
+        df.list()
+        assert(df.columnCount === 4)
+      //  assert(df.rowCount === 4)
+    }
+
     test("Column Index: Refer to a column of a DF") {
         val df = makeDF
         val colA = df("a")
@@ -357,6 +364,15 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
                 bad += 1
         }
         assert(bad.value === 0)
+    }
+
+    test("Union") {
+        val df1 = makeDF
+        val df2 = makeDF
+        df1.list()
+        val df3 = DF.union(sc, List(df1, df2))
+        assert(df3.rowCount === df1.rowCount + df2.rowCount)
+        df3.list()
     }
 
     test("toCSV") {

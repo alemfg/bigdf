@@ -7,8 +7,8 @@ package com.ayasdi.bigdf
 
 import java.io.File
 
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
-import scala.reflect.{ClassTag, classTag}
 
 private[bigdf] object CountHelper {
   def countNaN(row: Array[Any]) = {
@@ -56,4 +56,26 @@ object FileUtils {
       if (!f.delete())
         throw new RuntimeException("Failed to delete " + f.getAbsolutePath)}
   }
+
+  def dirToFiles(path: String, recursive: Boolean = true)(implicit sc: SparkContext) = {
+    import org.apache.hadoop.fs._
+    import scala.collection.mutable.MutableList
+    val fs = FileSystem.get(sc.hadoopConfiguration)
+    val files = fs.listFiles(new Path(path), recursive)
+    val fileList = MutableList[String]()
+    while(files.hasNext) {
+      val file = files.next
+      if(file.isFile) fileList += file.getPath.toUri.getPath
+    }
+
+    fileList.toList
+  }
+
+  def isDir(path: String)(implicit sc: SparkContext) = {
+    import org.apache.hadoop.fs._
+    val fs = FileSystem.get(sc.hadoopConfiguration)
+
+    true
+  }
+
 }
