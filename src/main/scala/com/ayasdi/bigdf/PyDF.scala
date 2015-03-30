@@ -123,7 +123,7 @@ case class PyPredicate(p: Predicate) {
 object PyPredicate {
   def where[T](column: PyColumn[T], operator: String, value: Double): PyPredicate = {
     val filter = operator match {
-      case "==" => column.col == value
+      case "==" => column.col === value
       case "!=" => column.col != value
       case "<" => column.col < value
       case "<=" => column.col <= value
@@ -135,7 +135,7 @@ object PyPredicate {
 
   def where[T](column: PyColumn[T], operator: String, value: String): PyPredicate = {
     val filter = operator match {
-      case "==" => column.col == value
+      case "==" => column.col === value
       case "!=" => column.col != value
       case "<" => column.col < value
       case "<=" => column.col <= value

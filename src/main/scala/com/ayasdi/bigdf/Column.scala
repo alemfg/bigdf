@@ -1,7 +1,8 @@
 /* Ayasdi Inc. Copyright 2014 - all rights reserved. */
 /**
  * @author mohit
- *         dataframe on spark
+ *         Column in a dataframe. It stores the data for the column in an RDD.
+ *         A column can exist without being in a dataframe but usually it will be added to one
  */
 package com.ayasdi.bigdf
 
@@ -15,8 +16,13 @@ import scala.collection.mutable.HashMap
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 
+/**
+ * For modularity column operations are grouped in several classes
+ * Import these implicit conversions to make that seamless
+ */
 object Preamble {
   import scala.language.implicitConversions
+
   implicit def columnDoubleToRichColumnDouble(col: Column[Double]) = new RichColumnDouble(col)
   implicit def columnAnyToRichColumnDouble(col: Column[Any]) = new RichColumnDouble(col.castDouble)
 
@@ -208,12 +214,10 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
           doubleRdd.take(max).foreach { println _ }
       }
       case ColType.String => {
-        {
           if (count <= max)
             stringRdd.collect.foreach { println _ }
           else
             stringRdd.take(max).foreach { println _ }
-        }
       }
       case _ => {
         if (count <= max)
@@ -227,16 +231,12 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * distinct
    */
-  def distinct = {
-    rdd.distinct
-  }
+  def distinct = rdd.distinct
 
   /**
    * does the column have any NA
    */
-  def hasNA = {
-    countNA > 0
-  }
+  def hasNA = countNA > 0
 
   /**
    * count the number of NAs
@@ -253,7 +253,6 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       }
     }
   }
-
 
   /**
    * get rdd of doubles to use doublerddfunctions etc
@@ -370,7 +369,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * compare two columns
    */
-  def ==(that: Column[_]): Predicate = {
+  def ===(that: Column[_]): Predicate = {
     if (isDouble && that.isDouble)
       new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.eqColumn)
     else if (isString && that.isString)
@@ -427,7 +426,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * compare every element in this column of doubles with a double
    */
-  def ==(that: Double) = {
+  def ===(that: Double) = {
     if (isDouble)
       new DoubleColumnWithDoubleScalarCondition(index, DoubleOps.eqFilter(that))
     else
@@ -437,7 +436,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * compare every element in this column of string with a string
    */
-  def ==(that: String) = {
+  def ===(that: String) = {
     if (isString)
       new StringColumnWithStringScalarCondition(index, StringOps.eqFilter(that))
     else

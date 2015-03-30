@@ -183,7 +183,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     test("Filter/Select: Double Column comparisons with Scalar") {
         val df = makeDF
-        val dfEq12 = df(df("a") == 12)
+        val dfEq12 = df(df("a") === 12)
         assert(dfEq12.rowCount === 1)
         val dfNe12 = df(df("a") != 12.0)
         assert(dfNe12.rowCount === 2)
@@ -199,15 +199,15 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     test("Filter/Select: Double Column comparisons with Scalar, no match") {
         val df = makeDF
-        val dfGt13 = df(df("a") == 133)
+        val dfGt13 = df(df("a") === 133)
         assert(dfGt13.rowCount === 0)
     }
 
     test("Filter/Select: String Column comparisons with Scalar") {
         val df = makeDFWithString
-        val dfEq12 = df(df("a") == "12.0")
+        val dfEq12 = df(df("a") === "12.0")
         assert(dfEq12.rowCount === 1)
-        val dfGt12 = df(df("a") == "12.0")
+        val dfGt12 = df(df("a") === "12.0")
         assert(dfGt12.rowCount === 1)
         val dfGtEq12 = df(df("a") >= "12.0")
         assert(dfGtEq12.rowCount === 2)
@@ -225,13 +225,13 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     test("Filter/Select: Logical combinations of predicates") {
         val df = makeDF
-        val dfAeq12AndBeq22 = df(df("a") == 12.0 && df("b") == 22)
+        val dfAeq12AndBeq22 = df(df("a") === 12.0 && df("b") === 22)
         assert(dfAeq12AndBeq22.rowCount === 1)
-        val dfAeq12OrBeq23 = df(df("a") == 12 || df("b") == 23)
+        val dfAeq12OrBeq23 = df(df("a") === 12 || df("b") === 23)
         assert(dfAeq12OrBeq23.rowCount === 2)
-        val dfNotAeq12 = df(!(df("a") == 12))
+        val dfNotAeq12 = df(!(df("a") === 12))
         assert(dfNotAeq12.rowCount === 2)
-        val dfAeq12XorBeq23 = df(df("a") == 12 ^^ df("b") == 23)
+        val dfAeq12XorBeq23 = df(df("a") === 12 ^^ df("b") === 23)
         assert(dfAeq12XorBeq23.rowCount === 2)
     }
 
