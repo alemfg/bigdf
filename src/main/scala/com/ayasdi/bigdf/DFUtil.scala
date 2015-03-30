@@ -75,7 +75,7 @@ object FileUtils {
     import org.apache.hadoop.fs._
     val fs = FileSystem.get(sc.hadoopConfiguration)
 
-    true
+    fs.isDirectory(new Path(path))
   }
 
 }

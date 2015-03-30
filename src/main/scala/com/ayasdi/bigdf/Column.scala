@@ -483,12 +483,13 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * apply a given function to a column to generate a new column
    * the new column does not belong to any DF automatically
+   * FIXME: other column types
    */
   def map[U: ClassTag](mapper: Any => U) = {
     val mapped = if (isDouble) {
-      doubleRdd.map { row => mapper(row)}
+      doubleRdd.map { row => mapper(row) }
     } else {
-      stringRdd.map { row => mapper(row)}
+      stringRdd.map { row => mapper(row) }
     }
     if (classTag[U] == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
@@ -519,6 +520,10 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
 }
 
 object Column {
+  /**
+   * Parse an RDD of Strings into a Column of Doubles. Parse errors are counted in parseErrors field.
+   * Items with parse failures become NaNs
+   */
   def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int, cacheLevel: StorageLevel) = {
     val col = new Column[Double](sCtx, null, index)
     val parseErrors = col.parseErrors
@@ -538,6 +543,10 @@ object Column {
     col
   }
 
+  /**
+   * Parse an RDD of Strings into a Column of Floats. Parse errors are counted in parseErrors field
+   * Items with parse failures become NaNs
+   */
   def asFloats(sCtx: SparkContext, stringRdd: RDD[String], index: Int, cacheLevel: StorageLevel) = {
     val col = new Column[Float](sCtx, null, index)
     val parseErrors = col.parseErrors
@@ -557,6 +566,10 @@ object Column {
     col
   }
 
+  /**
+   * Map an RDD of Doubles into a Column of Shorts representing categories. Errors are counted in parseErrors field.
+   * Column of categories aka Categorical column has operations for categories like One Hot Encode etc
+   */
   def asShorts(sCtx: SparkContext, doubleRdd: RDD[Double], index: Int, cacheLevel: StorageLevel) = {
     val col = new Column[Short](sCtx, null, index)
     val parseErrors = col.parseErrors
@@ -579,6 +592,4 @@ object Column {
   def apply[T: ru.TypeTag](sCtx: SparkContext, rdd: RDD[T], index: Int = -1) = {
     new Column[T](sCtx, rdd.asInstanceOf[RDD[Any]], index)
   }
-
-
 }
