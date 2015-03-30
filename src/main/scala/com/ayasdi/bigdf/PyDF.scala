@@ -12,8 +12,8 @@ import org.apache.spark.api.java.JavaRDD
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 import Preamble._
-
-
+import java.util.{ArrayList => JArrayList}
+import scala.collection.JavaConverters._
 
 case class PyDF(df: DF) {
   def columnNames = df.columnNames
@@ -30,14 +30,30 @@ case class PyDF(df: DF) {
     df.update(name, pycol.col)
   }
   
-  def aggregate(byColumn: String, aggrColumn: String, aggregator: String) : PyDF = {
+  def rowCount = df.rowCount
+  
+  def colCount = df.colCount
+  
+  def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String) : PyDF = {
+    val byColumn = byColumnJ.asScala.toList
+    val aggrColumn = aggrColumnJ.asScala.toList
     val dfAgg = aggregator match {
       case "Mean" => df.aggregate(byColumn, aggrColumn, AggMean)
+      case "Count" => df.aggregate(byColumn, aggrColumn, AggCount)
       case "StrJoin" => df.aggregate(byColumn, aggrColumn, new AggMakeString(","))
       case _ => null
     }
     PyDF(dfAgg)
   }
+  
+  def groupBy(colName: String) = df.groupBy(colName)
+  
+  def pivot(keyCol: String, pivotByCol: String,
+            pivotedCols: JArrayList[String]): PyDF = {
+    PyDF(df.pivot(keyCol, pivotByCol, pivotedCols.asScala.toList))
+  }
+  
+  def writeToCSV(file: String, separator: String = ","): Unit = df.writeToCSV(file, separator)
 }
 
 object PyDF {
@@ -53,6 +69,8 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
     val name = s"${col.rdd.name}".split('/').last.split('.').head
     s"$name\t${col.colType}"
   }
+  
+  def tpe = s"${col.colType}"
 
   def stats = {
     col.colType match {
@@ -79,7 +97,7 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   }
 
   def pythonToJava(c : JavaRDD[Array[Byte]]) = {
-      val jrdd = BigDFPyRDD.javaRDD(c)
+      val jrdd : JavaRDD[Double] = BigDFPyRDD.javaRDD(c)
       val newCol = Column(col.sc, jrdd.rdd, 0)
       PyColumn(newCol)
   }

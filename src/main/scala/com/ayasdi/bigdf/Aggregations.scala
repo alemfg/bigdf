@@ -44,6 +44,21 @@ trait Aggregator[U, V, W] {
   def finalize(x: V): W = x.asInstanceOf[W]
 }
 
+case object AggCount extends Aggregator[Any, Long, Double] {
+
+  /*
+      for each column, set sum to cell's value and count to 1
+   */
+  override def convert(a: Any) = 1L
+
+  /*
+      add running sums and counts
+   */
+  def aggregate(a: Long, b: Long) = (a + b)
+  
+  override def finalize(x: Long): Double = x
+}
+
 case object AggMean extends Aggregator[Double, Tuple2[Double, Long], Double] {
   type SumNCount = Tuple2[Double, Long]
 

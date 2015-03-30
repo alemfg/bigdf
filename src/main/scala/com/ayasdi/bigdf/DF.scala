@@ -403,7 +403,7 @@ case class DF private(val sc: SparkContext,
   (aggdByCols: Seq[String], aggdCol: String, aggtor: Aggregator[U, V, W]) = {
 
     val wtpe = classTag[W]
-    require(cols(aggdCol).compareType(classTag[U]))
+    if (aggtor != AggCount) require(cols(aggdCol).compareType(classTag[U]))
 
     val newDf = DF(sc, s"${name}/${aggdCol}_aggby_${aggdByCols.mkString(";")}")
 
@@ -524,9 +524,7 @@ case class DF private(val sc: SparkContext,
    * @return new pivoted DF
    */
   def pivot(keyCol: String, pivotByCol: String,
-            pivotedCols: List[Int] = cols.values.map {
-              _.index
-            }.toList): DF = {
+            pivotedCols: List[String] = cols.keys.toList): DF = {
     val grped = groupBy(keyCol)
     val pivotValues =  column(pivotByCol).colType match {
       case ColType.String =>  column(pivotByCol).distinct.collect.asInstanceOf[Array[String]]
@@ -539,9 +537,7 @@ case class DF private(val sc: SparkContext,
     }
 
     val pivotIndex = cols.getOrElse(pivotByCol, null).index
-    val cleanedPivotedCols = pivotedCols.filter {
-      _ != cols(pivotByCol).index
-    }
+    val cleanedPivotedCols = pivotedCols.map { cols(_).index}.filter { _ != cols(pivotByCol).index }
 
     val newDf = DF(sc, s"${name}_${keyCol}_pivot_${pivotByCol}")
     pivotValues.foreach { pivotValue =>
