@@ -108,7 +108,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     test("Column Index: Refer to non-existent column of a DF") {
         val df = makeDF
         val col = df("aa")
-        assert(col === null)
+        assert(col == null)
     }
 
     test("Column Index: Refer to multiple columns of a DF") {
@@ -125,7 +125,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     test("Column Index: Refer to non-existent columns of a DF") {
         val df = makeDF
         val colSeq = df("a", "bb")
-        assert(colSeq === null)
+        assert(colSeq == null)
     }
 
     test("Column Index: Slices") {
