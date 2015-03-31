@@ -47,12 +47,12 @@ trait Aggregator[U, V, W] {
 case object AggCount extends Aggregator[Any, Long, Double] {
 
   /*
-      for each column, set sum to cell's value and count to 1
+      for each column, set count to 1
    */
   override def convert(a: Any) = 1L
 
   /*
-      add running sums and counts
+      add running counts
    */
   def aggregate(a: Long, b: Long) = (a + b)
   
