@@ -11,6 +11,7 @@ import org.apache.spark.rdd.RDD
 import net.razorvine.pickle.{Pickler, Unpickler}
 import java.util.{ArrayList => JArrayList}
 import scala.collection.JavaConverters._
+import scala.reflect.ClassTag
   
 
 object BigDFPyRDD {
@@ -32,13 +33,13 @@ object BigDFPyRDD {
      }   
 	}
 
-  def javaRDD(pyrdd: JavaRDD[Array[Byte]]) : JavaRDD[Double] = {
+  def javaRDD[T: ClassTag](pyrdd: JavaRDD[Array[Byte]]) : JavaRDD[T] = {
 	  pyrdd.rdd.mapPartitions { iter =>
 	    initialize()
 	    val unpickle = new Unpickler
 	    iter.flatMap { row =>
 	      val v = unpickle.loads(row)
-        v.asInstanceOf[JArrayList[Double]].asScala
+        v.asInstanceOf[JArrayList[T]].asScala
 	    }
 	  }.toJavaRDD()
   }
