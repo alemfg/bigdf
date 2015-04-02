@@ -545,7 +545,7 @@ case class DF private(val sc: SparkContext,
       case ColType.String => newDf.update(s"$keyCol", 
           Column(sc, grped.map(_._1.asInstanceOf[String])))
       case ColType.Double =>  newDf.update(s"$keyCol",
-          Column(sc, grped.map(_._1).asInstanceOf[RDD[Double]]))
+          Column(sc, grped.map(_._1.asInstanceOf[Double])))
       case _ => {
         println(s"Pivot does not yet support columns ${column(keyCol)}")
         null
