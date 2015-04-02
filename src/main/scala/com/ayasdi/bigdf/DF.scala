@@ -540,6 +540,17 @@ case class DF private(val sc: SparkContext,
     val cleanedPivotedCols = pivotedCols.map { cols(_).index}.filter { _ != cols(pivotByCol).index }
 
     val newDf = DF(sc, s"${name}_${keyCol}_pivot_${pivotByCol}")
+    // add key column back into the new df
+    column(keyCol).colType match {
+      case ColType.String => newDf.update(s"$keyCol", 
+          Column(sc, grped.map(_._1.asInstanceOf[String])))
+      case ColType.Double =>  newDf.update(s"$keyCol",
+          Column(sc, grped.map(_._1).asInstanceOf[RDD[Double]]))
+      case _ => {
+        println(s"Pivot does not yet support columns ${column(keyCol)}")
+        null
+      }
+    }
     pivotValues.foreach { pivotValue =>
       val grpSplit = new PivotHelper(grped, pivotIndex, pivotValue).get
 
