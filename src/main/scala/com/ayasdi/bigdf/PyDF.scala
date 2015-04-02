@@ -15,7 +15,7 @@ import Preamble._
 import java.util.{ArrayList => JArrayList}
 import scala.collection.JavaConverters._
 
-case class PyDF(val df: DF) {
+case class PyDF(df: DF) {
   def columnNames = df.columnNames
 
   def column(name: String) = PyColumn(df.column(name))
