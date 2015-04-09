@@ -689,7 +689,7 @@ object DF {
    * @param separator The field separator e.g. ',' for CSV file
    */
   def apply(inFile: String, separator: Char, fasterGuess: Boolean)(implicit sc: SparkContext): DF = {
-    apply(sc, inFile, separator, fasterGuess)
+    apply(sc, inFile, separator, fasterGuess, 0)
   }
 
   /**
@@ -700,14 +700,17 @@ object DF {
    * @param inFile Full path to the input CSV/TSV file. If running on cluster, it should be accessible on all nodes
    * @param separator The field separator e.g. ',' for CSV file
    * @param fasterGuess Just use true unless you are having trouble
+   * @param nParts number of parts to process in parallel
    */
-  def apply(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean): DF = {
-    if(FileUtils.isDir(inFile)(sc)) fromDir(sc, inFile, separator, fasterGuess)
-    else fromFile(sc, inFile, separator, fasterGuess)
+  def apply(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean, nParts: Int): DF = {
+    if(FileUtils.isDir(inFile)(sc)) fromDir(sc, inFile, separator, fasterGuess, nParts)
+    else fromFile(sc, inFile, separator, fasterGuess, nParts)
   }
 
-  def fromDir(sc: SparkContext, inDir: String, separator: Char, fasterGuess: Boolean): DF = {
-    val dfs = FileUtils.dirToFiles(inDir)(sc).map { file => fromFile(sc, file, separator, fasterGuess) }
+  def fromDir(sc: SparkContext, inDir: String, separator: Char, fasterGuess: Boolean, nParts: Int = 0): DF = {
+    val files = FileUtils.dirToFiles(inDir)(sc)
+    val numPartitions = if(nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
+    val dfs = files.map { file => fromFile(sc, file, separator, fasterGuess, numPartitions) }
     union(sc, dfs)
   }
 
@@ -719,11 +722,12 @@ object DF {
    * @param inFile Full path to the input CSV/TSV file. If running on cluster, it should be accessible on all nodes
    * @param separator The field separator e.g. ',' for CSV file
    * @param fasterGuess Just use true unless you are having trouble
+   * @param nParts number of parts to process in parallel
    */
-  def fromFile(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean): DF  = {
-    val df: DF = DF(sc, inFile)
+  def fromFile(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean, nParts: Int = 0): DF = {
+    val df: DF = DF(sc, s"fromFile: $inFile")
     df.defaultStorageLevel = MEMORY_ONLY_SER //FIXME: allow changing this
-    val file = sc.textFile(inFile)
+    val file = if(nParts == 0) sc.textFile(inFile) else sc.textFile(inFile, nParts)
 
     // parse header line
     val firstLine = file.first
@@ -958,8 +962,32 @@ object DF {
     leftWithKey.join(rightWithKey)
   }
 
+  def compareSchema(a: DF, b: DF) = {
+    val aColNames = a.columnNames.sorted
+    val bColNames = b.columnNames.sorted
+    val sameNames = aColNames.sameElements(bColNames)
+
+    val aColTypes = a.columns().map { col => col.colType }
+    val bColTypes = b.columns().map { col => col.colType }
+    val sameTypes = aColTypes.sameElements(bColTypes)
+
+    if(!(sameNames && sameTypes)) {
+      println(s"${a.name} and ${b.name} differ in schema")
+      println(s"a: $aColNames")
+      println(s"b: $bColNames")
+      println(s"a: $aColTypes")
+      println(s"a: $bColTypes")
+      false
+    } else {
+      println(s"${a.name} and ${b.name} have the same schema")
+      true
+    }
+
+  }
+
   def union(sc: SparkContext, dfs: List[DF]) = {
     require(dfs.size > 0)
+    require(dfs.tail.forall { df => compareSchema(dfs.head, df) })
 
     val cols = dfs.head.cols.clone
     val df = dfs.head

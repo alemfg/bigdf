@@ -57,9 +57,9 @@ case class PyDF(df: DF) {
 }
 
 object PyDF {
-  def fromCSV(sc: SparkContext, name: String, separator: String, fasterGuess: Boolean): PyDF = {
+  def fromCSV(sc: SparkContext, name: String, separator: String, fasterGuess: Boolean, nParts: Int = 0): PyDF = {
     val sep: Char = separator.charAt(0)
-    PyDF(DF(sc, name, sep, fasterGuess))
+    PyDF(DF(sc, name, sep, fasterGuess, nParts))
   }
 }
 

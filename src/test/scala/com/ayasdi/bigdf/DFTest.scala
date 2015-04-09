@@ -69,6 +69,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         DF(file, ',', false)
     }
 
+    private[bigdf] def makeDFFromCSVFile2(file: String) = {
+        DF.fromFile(sc, file, ',', false, 2)
+    }
+
     test("Construct: DF from Vector") {
         val df = makeDF
         assert(df.columnCount === 4)
@@ -77,6 +81,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     test("Construct: DF from CSV file") {
         val df = makeDFFromCSVFile("src/test/resources/pivot.csv")
+        assert(df.columnCount === 4)
+        assert(df.rowCount === 4)
+
+        val df2 = makeDFFromCSVFile2("src/test/resources/pivot.csv")
         assert(df.columnCount === 4)
         assert(df.rowCount === 4)
     }
