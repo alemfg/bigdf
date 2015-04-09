@@ -537,10 +537,18 @@ case class DF private(val sc: SparkContext,
     }
 
     val pivotIndex = cols.getOrElse(pivotByCol, null).index
-    val cleanedPivotedCols = pivotedCols.map { cols(_).index}.filter { _ != cols(pivotByCol).index }
+
+    /*
+        filter pivot by and key column from output
+     */
+    val cleanedPivotedCols = pivotedCols.map { cols(_).index }
+      .filter { colIndex => colIndex != cols(pivotByCol).index && colIndex != cols(keyCol).index  }
 
     val newDf = DF(sc, s"${name}_${keyCol}_pivot_${pivotByCol}")
-    // add key column back into the new df
+
+    /*
+        add key column to output
+     */
     column(keyCol).colType match {
       case ColType.String => newDf.update(s"$keyCol", 
           Column(sc, grped.map(_._1.asInstanceOf[String])))
@@ -548,9 +556,12 @@ case class DF private(val sc: SparkContext,
           Column(sc, grped.map(_._1.asInstanceOf[Double])))
       case _ => {
         println(s"Pivot does not yet support columns ${column(keyCol)}")
-        null
       }
     }
+
+    /*
+        add pivoted columns
+     */
     pivotValues.foreach { pivotValue =>
       val grpSplit = new PivotHelper(grped, pivotIndex, pivotValue).get
 
@@ -982,7 +993,6 @@ object DF {
       println(s"${a.name} and ${b.name} have the same schema")
       true
     }
-
   }
 
   def union(sc: SparkContext, dfs: List[DF]) = {

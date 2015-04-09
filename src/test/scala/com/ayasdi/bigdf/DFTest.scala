@@ -364,14 +364,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         df2.describe
         df2.list()
         assert(df2.rowCount === 3)
-        assert(df2.columnCount === 6)
-        val df3 = df2("S_Customer@Period==2.0").stringRdd.zip(df2("S_Customer@Period==1.0").stringRdd)
-        val bad = sc.accumulator(0)
-        df3.foreach { case (a, b) => 
-            if(!a.isEmpty && !b.isEmpty && a != b)
-                bad += 1
-        }
-        assert(bad.value === 0)
+        assert(df2.columnCount === 5)
     }
 
     test("Union") {
