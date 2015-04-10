@@ -7,10 +7,9 @@
 package com.ayasdi.bigdf
 
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
 import org.apache.spark.sql.types._
+import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable.HashMap
 import scala.reflect.runtime.{universe => ru}
@@ -528,15 +527,7 @@ object Column {
     val col = new Column[Double](sCtx, null, index)
     val parseErrors = col.parseErrors
 
-    val doubleRdd = stringRdd.map { x =>
-      var y = Double.NaN
-      try {
-        y = x.toDouble
-      } catch {
-        case _: java.lang.NumberFormatException => parseErrors += 1
-      }
-      y
-    }
+    val doubleRdd = stringRdd.map { x => SchemaUtils.parseDouble(parseErrors, x) }
     doubleRdd.setName(s"${stringRdd.name}.toDouble").persist(cacheLevel)
     col.rdd = doubleRdd.asInstanceOf[RDD[Any]]
 

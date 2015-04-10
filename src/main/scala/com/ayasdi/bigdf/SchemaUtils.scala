@@ -6,13 +6,37 @@
 
 package com.ayasdi.bigdf
 
-import org.apache.spark.SparkContext
+import org.apache.spark.{Accumulator, SparkContext}
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.runtime.{universe => ru}
 import scala.util.{Random, Try}
 
 object SchemaUtils {
+
+  /**
+   * try to parse a string as a double
+   * use Config.NumberParsing._ to handle exceptions
+   */
+  def parseDouble(str: String): Double = {
+    if (str == null || str.isEmpty) Config.NumberParsing.emptyStrReplace.toDouble
+    else if (Config.NumberParsing.nans.contains(str)) Config.NumberParsing.nanValue
+    else str.toDouble
+  }
+
+  /**
+   *  try to parse a string as a double, count parse errors
+   */
+  def parseDouble(parseErrors: Accumulator[Long], str: String): Double = {
+    var y = Double.NaN
+    try {
+      y = parseDouble(str)
+    } catch {
+      case _: java.lang.NumberFormatException => parseErrors += 1
+    }
+    y
+  }
+
   /**
    * guess the type of a column by looking at a random sample
    * however, this is slow because spark will cause a large amount(maybe all)
@@ -34,14 +58,14 @@ object SchemaUtils {
   }
 
   /**
-   * guess the type of a column by looking at the firt few rows (for now 5)
+   * guess the type of a column by looking at the first few rows (for now 5)
    * only materializes the first few rows of first partition, hence faster
    */
   def guessTypeByFirstFew(col: Array[String]) = {
     val samples = col.take(5)
     val parseFailCount = samples.filter { str =>
       Try {
-        str.toDouble
+        parseDouble(str)
       }.toOption == None
     }.length
 

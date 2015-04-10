@@ -7,7 +7,8 @@ package com.ayasdi.bigdf
 
 object Config {
   object NumberParsing {
-    var emptyStringOK = false
-    var emptyStringValue = Double.NaN
+    var emptyStrReplace = ""
+    var nans = List("NaN", "NULL", "N/A")
+    var nanValue = Double.NaN
   }
 }
