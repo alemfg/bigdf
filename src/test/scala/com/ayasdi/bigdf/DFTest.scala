@@ -162,7 +162,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         assert(df4.colIndexToName(2) === "c")
     }
 
-    test("Parsing: Parse doubles") {
+    test("Parsing: Parse mixed doubles") {
         val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv")
         df.cols.foreach { col =>
           col._2.colType match {
@@ -171,6 +171,14 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
           }
         }
         assert(df("Feature1").parseErrors.value === 1)
+    }
+
+    test("Parse doubles") {
+        val df = DF(sc, "src/test/resources/doubles.csv", ',', true, 0)
+        val parsed = df("F2").doubleRdd.collect()
+        println(parsed.mkString(", "))
+        assert(List(0, 2, 3, 4, 5, 6).forall { parsed(_).isNaN } )
+        assert(parsed(1) == 2.1)
     }
 
     test("Double to Categorical") {
