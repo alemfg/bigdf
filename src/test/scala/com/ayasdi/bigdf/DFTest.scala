@@ -14,6 +14,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import scala.collection.TraversableOnce.MonadOps
+import scala.collection.immutable.HashMap
 
 class DFTest extends FunSuite with BeforeAndAfterAll {
     implicit var sc: SparkContext = _
@@ -175,10 +176,17 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     test("Parse doubles") {
         val df = DF(sc, "src/test/resources/doubles.csv", ',', true, 0)
+        assert(df("F1").isDouble)
         val parsed = df("F2").doubleRdd.collect()
         println(parsed.mkString(", "))
         assert(List(0, 2, 3, 4, 5, 6).forall { parsed(_).isNaN } )
         assert(parsed(1) == 2.1)
+    }
+
+    test("Schema Dictate") {
+        val df = DF.fromFile(sc, "src/test/resources/doubles.csv", ',', true, 0, Map("F1" -> ColType.String))
+        assert(df("F1").isString)
+        df.list()
     }
 
     test("Double to Categorical") {

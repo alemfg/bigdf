@@ -56,8 +56,6 @@ class LineCsvParser(_fieldSep: Char = ',', _ignoreSpace: Boolean = true)
  */
 class BulkCsvParser (iter: Iterator[String], split: Int, _fieldSep: Char = ',', _ignoreSpace: Boolean = true)
   extends BaseCsvParser(_fieldSep, _ignoreSpace) with Iterator[Array[String]] {
-  
-  println(s"Creating BulkCsvReader for partition:$split fieldSep:${_fieldSep} ignoreSpace:${_ignoreSpace}")
   val reader = new StringIteratorReader(iter, lineSep)
   parser.beginParsing(reader)
   var nextRecord =  parser.parseNext()

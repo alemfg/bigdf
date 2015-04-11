@@ -735,7 +735,8 @@ object DF {
    * @param fasterGuess Just use true unless you are having trouble
    * @param nParts number of parts to process in parallel
    */
-  def fromFile(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean, nParts: Int = 0): DF = {
+  def fromFile(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean, nParts: Int = 0,
+               schema: Map[String, ColType.EnumVal] = Map()): DF = {
     val df: DF = DF(sc, s"fromFile: $inFile")
     df.defaultStorageLevel = MEMORY_ONLY_SER //FIXME: allow changing this
     val file = if(nParts == 0) sc.textFile(inFile) else sc.textFile(inFile, nParts)
@@ -765,12 +766,18 @@ object DF {
     }
 
     var i = 0
-    val firstFewRows = if(fasterGuess) rows.take(5) else null
     columns.foreach { col =>
-      val t = if (fasterGuess) {
-        SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) })
+      val t = if(schema.contains(header(i))) {
+        schema.get(header(i)).get
+      } else if(Config.NumberParsing.enable) {
+        if (fasterGuess) {
+          val firstFewRows = rows.take(Config.SchemaGuessing.fastSamplingSize)
+          SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) })
+        } else {
+          SchemaUtils.guessType(sc, columns(i))
+        }
       } else {
-        SchemaUtils.guessType(sc, columns(i))
+        ru.typeOf[String]
       }
       col.setName(s"$t/$inFile/${df.colIndexToName(i)}")
       println(s"Column: ${df.colIndexToName(i)} \t\t\tGuessed Type: ${t}")
@@ -987,7 +994,10 @@ object DF {
       println(s"a: $aColNames")
       println(s"b: $bColNames")
       println(s"a: $aColTypes")
-      println(s"a: $bColTypes")
+      println(s"b: $bColTypes")
+      // val bt = bColNames.zip(bColTypes)
+      // val at = aColNames.zip(aColTypes)
+      // (0 until columnCount).foreach{ x => if(at(x)._2 != bt(x)._2) println(s"${at(x)} -- ${bt(x)} == $x") }
       false
     } else {
       println(s"${a.name} and ${b.name} have the same schema")

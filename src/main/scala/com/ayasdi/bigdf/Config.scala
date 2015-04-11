@@ -10,5 +10,9 @@ object Config {
     var emptyStrReplace = "NaN"
     var nans = List("NaN", "NULL", "N/A")
     var nanValue = Double.NaN
+    var enable = true
+  }
+  object SchemaGuessing {
+    var fastSamplingSize = 5
   }
 }

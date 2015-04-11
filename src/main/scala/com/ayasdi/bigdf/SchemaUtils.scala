@@ -61,8 +61,7 @@ object SchemaUtils {
    * guess the type of a column by looking at the first few rows (for now 5)
    * only materializes the first few rows of first partition, hence faster
    */
-  def guessTypeByFirstFew(col: Array[String]) = {
-    val samples = col.take(5)
+  def guessTypeByFirstFew(samples: Array[String]) = {
     val parseFailCount = samples.filter { str =>
       Try {
         parseDouble(str)
