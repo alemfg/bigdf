@@ -5,6 +5,8 @@
  */
 package com.ayasdi.bigdf
 
+import com.ayasdi.bigdf.ColType.EnumVal
+import com.ayasdi.bigdf.readers.{BulkCsvReader, LineCsvReader}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.rdd.UnionRDD
@@ -696,32 +698,20 @@ object DF {
    * create DF from a text file with given separator
    * first line of file is a header
    * For CSV/TSV files only numeric(for now only Double) and String data types are supported
-   * @param inFile Full path to the input CSV/TSV file. If running on cluster, it should be accessible on all nodes
-   * @param separator The field separator e.g. ',' for CSV file
-   */
-  def apply(inFile: String, separator: Char, fasterGuess: Boolean)(implicit sc: SparkContext): DF = {
-    apply(sc, inFile, separator, fasterGuess, 0)
-  }
-
-  /**
-   * create DF from a text file with given separator
-   * first line of file is a header
-   * For CSV/TSV files only numeric(for now only Double) and String data types are supported
    * @param sc The spark context
    * @param inFile Full path to the input CSV/TSV file. If running on cluster, it should be accessible on all nodes
    * @param separator The field separator e.g. ',' for CSV file
-   * @param fasterGuess Just use true unless you are having trouble
    * @param nParts number of parts to process in parallel
    */
-  def apply(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean, nParts: Int): DF = {
-    if(FileUtils.isDir(inFile)(sc)) fromDir(sc, inFile, separator, fasterGuess, nParts)
-    else fromFile(sc, inFile, separator, fasterGuess, nParts)
+  def apply(sc: SparkContext, inFile: String, separator: Char, nParts: Int): DF = {
+    if(FileUtils.isDir(inFile)(sc)) fromDir(sc, inFile, separator, nParts)
+    else fromFile(sc, inFile, separator, nParts)
   }
 
-  def fromDir(sc: SparkContext, inDir: String, separator: Char, fasterGuess: Boolean, nParts: Int = 0): DF = {
+  def fromDir(sc: SparkContext, inDir: String, separator: Char, nParts: Int): DF = {
     val files = FileUtils.dirToFiles(inDir)(sc)
     val numPartitions = if(nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
-    val dfs = files.map { file => fromFile(sc, file, separator, fasterGuess, numPartitions) }
+    val dfs = files.map { file => fromFile(sc, file, separator, numPartitions) }
     union(sc, dfs)
   }
 
@@ -732,18 +722,16 @@ object DF {
    * @param sc The spark context
    * @param inFile Full path to the input CSV/TSV file. If running on cluster, it should be accessible on all nodes
    * @param separator The field separator e.g. ',' for CSV file
-   * @param fasterGuess Just use true unless you are having trouble
    * @param nParts number of parts to process in parallel
    */
-  def fromFile(sc: SparkContext, inFile: String, separator: Char, fasterGuess: Boolean, nParts: Int = 0,
-               schema: Map[String, ColType.EnumVal] = Map()): DF = {
+  def fromFile(sc: SparkContext, inFile: String, separator: Char, nParts: Int, schema: Map[String, EnumVal] = Map()): DF = {
     val df: DF = DF(sc, s"fromFile: $inFile")
     df.defaultStorageLevel = MEMORY_ONLY_SER //FIXME: allow changing this
     val file = if(nParts == 0) sc.textFile(inFile) else sc.textFile(inFile, nParts)
 
     // parse header line
     val firstLine = file.first
-    val header = new LineCsvParser(separator).parseLine(firstLine)
+    val header = new LineCsvReader(separator).parseLine(firstLine)
     println(s"Found ${header.size} columns in header")
     df.addHeader(header)
 
@@ -755,7 +743,7 @@ object DF {
 
     val rows = dataLines.mapPartitionsWithIndex({
       case (split, iter) => {
-        new BulkCsvParser(iter, split, separator)
+        new BulkCsvReader(iter, split, separator)
       }
     }, true).persist(df.defaultStorageLevel)
 
@@ -770,7 +758,7 @@ object DF {
       val t = if(schema.contains(header(i))) {
         schema.get(header(i)).get
       } else if(Config.NumberParsing.enable) {
-        if (fasterGuess) {
+        if (Config.SchemaGuessing.fastSamplingEnable) {
           val firstFewRows = rows.take(Config.SchemaGuessing.fastSamplingSize)
           SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) })
         } else {

@@ -14,5 +14,10 @@ object Config {
   }
   object SchemaGuessing {
     var fastSamplingSize = 5
+    var fastSamplingEnable = true
+  }
+  object CsvParsing {
+    var quoteChar = '"'
+    var escapeChar = '\\'
   }
 }

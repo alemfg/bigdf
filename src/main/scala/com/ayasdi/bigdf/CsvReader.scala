@@ -1,27 +1,35 @@
-/* Ayasdi Inc. Copyright 2015 - all rights reserved. */
-/**
- * @author mohit
- *         Utils for accessing stored data e.g. CSV files
+/*
+ * Copyright 2015 Ayasdi Inc
  */
-package com.ayasdi.bigdf
+
+package com.ayasdi.bigdf.readers
 
 import java.io.StringReader
 import com.univocity.parsers.csv._
 
-abstract class BaseCsvParser(fieldSep: Char, ignoreSpace: Boolean) {
-  val lineSep = "\n"
-  val parser = makeParser(fieldSep, lineSep, ignoreSpace)
-  
-  private def makeParser(fieldSep: Char, lineSep: String, ignoreSpace: Boolean) = {
+abstract class CsvReader(fieldSep: Char = ',',
+                         lineSep: String = "\n",
+                         quote: Char = '"',
+                         escape: Char = '\\',
+                         ignoreLeadingSpace: Boolean = true,
+                         ignoreTrailingSpace: Boolean = true,
+                         headers: Seq[String],
+                         inputBufSize: Int = 128,
+                         maxCols: Int = 20480) {
+  lazy val parser = {
     val settings = new CsvParserSettings()
     val format = settings.getFormat
     format.setDelimiter(fieldSep)
     format.setLineSeparator(lineSep)
-    settings.setIgnoreLeadingWhitespaces(ignoreSpace)
-    settings.setIgnoreTrailingWhitespaces(ignoreSpace)
+    format.setQuote(quote)
+    format.setQuoteEscape(escape)
+    settings.setIgnoreLeadingWhitespaces(ignoreLeadingSpace)
+    settings.setIgnoreTrailingWhitespaces(ignoreTrailingSpace)
     settings.setReadInputOnSeparateThread(false)
-    settings.setInputBufferSize(100) //FIXME: tune the size of this buffer
-    settings.setMaxColumns(20480)
+    settings.setInputBufferSize(inputBufSize)
+    settings.setMaxColumns(maxCols)
+    settings.setNullValue("")
+    if(headers != null) settings.setHeaders(headers:_*)
 
     new CsvParser(settings)
   }
@@ -29,11 +37,24 @@ abstract class BaseCsvParser(fieldSep: Char, ignoreSpace: Boolean) {
 
 /**
  * Parser for parsing a line at a time. Not efficient for bulk data.
- * @param _fieldSep
- * @param _ignoreSpace
  */
-class LineCsvParser(_fieldSep: Char = ',', _ignoreSpace: Boolean = true)
-  extends BaseCsvParser(_fieldSep, _ignoreSpace) {
+class LineCsvReader(fieldSep: Char = ',',
+                    lineSep: String = "\n",
+                    quote: Char = '"',
+                    escape: Char = '\\',
+                    ignoreLeadingSpace: Boolean = true,
+                    ignoreTrailingSpace: Boolean = true,
+                    inputBufSize: Int = 128,
+                    maxCols: Int = 20480)
+  extends CsvReader(fieldSep,
+    lineSep,
+    quote,
+    escape,
+    ignoreLeadingSpace,
+    ignoreTrailingSpace,
+    null,
+    inputBufSize,
+    maxCols) {
   /**
    * parse a line
    * @param line a String with no newline at the end
@@ -50,12 +71,29 @@ class LineCsvParser(_fieldSep: Char = ',', _ignoreSpace: Boolean = true)
 /**
  * Parser for parsing lines in bulk. Use this when efficiency is desired.
  * @param iter iterator over lines in the file
- * @param _fieldSep field separator, comma is the default
- * @param _ignoreSpace whether to ignore surrounding whitespace
- * @param split partition number
  */
-class BulkCsvParser (iter: Iterator[String], split: Int, _fieldSep: Char = ',', _ignoreSpace: Boolean = true)
-  extends BaseCsvParser(_fieldSep, _ignoreSpace) with Iterator[Array[String]] {
+class BulkCsvReader (iter: Iterator[String],
+                     split: Int,      // for debugging
+                     fieldSep: Char = ',',
+                     lineSep: String = "\n",
+                     quote: Char = '"',
+                     escape: Char = '\\',
+                     ignoreLeadingSpace: Boolean = true,
+                     ignoreTrailingSpace: Boolean = true,
+                     headers: Seq[String] = null,
+                     inputBufSize: Int = 128,
+                     maxCols: Int = 20480)
+  extends CsvReader(fieldSep,
+    lineSep,
+    quote,
+    escape,
+    ignoreLeadingSpace,
+    ignoreTrailingSpace,
+    headers,
+    inputBufSize,
+    maxCols)
+  with Iterator[Array[String]] {
+
   val reader = new StringIteratorReader(iter, lineSep)
   parser.beginParsing(reader)
   var nextRecord =  parser.parseNext()
@@ -66,13 +104,13 @@ class BulkCsvParser (iter: Iterator[String], split: Int, _fieldSep: Char = ',', 
    */
   def next = {
     val curRecord = nextRecord
-    if(curRecord != null) 
+    if(curRecord != null)
       nextRecord = parser.parseNext()
     else
       throw new NoSuchElementException("next record is null")
     curRecord
   }
-  
+
   def hasNext = nextRecord != null
 
 }
@@ -80,7 +118,7 @@ class BulkCsvParser (iter: Iterator[String], split: Int, _fieldSep: Char = ',', 
 /**
  * A Reader that "reads" from a sequence of lines. Spark's textFile method removes newlines at end of
  * each line
- * Univocity parser requires a Reader that provides access to the data to be parsed and needs the newlines to 
+ * Univocity parser requires a Reader that provides access to the data to be parsed and needs the newlines to
  * be present
  * @param iter iterator over RDD[String]
  */

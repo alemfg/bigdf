@@ -67,11 +67,11 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     private[bigdf] def makeDFFromCSVFile(file: String) = {
-        DF(file, ',', false)
+        DF(sc, file, ',', 0)
     }
 
     private[bigdf] def makeDFFromCSVFile2(file: String) = {
-        DF.fromFile(sc, file, ',', false, 2)
+        DF(sc, file, ',', 2)
     }
 
     test("Construct: DF from Vector") {
@@ -164,6 +164,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     test("Parsing: Parse mixed doubles") {
+        Config.SchemaGuessing.fastSamplingSize = 3
         val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv")
         df.cols.foreach { col =>
           col._2.colType match {
@@ -175,7 +176,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     test("Parse doubles") {
-        val df = DF(sc, "src/test/resources/doubles.csv", ',', true, 0)
+        val df = DF(sc, "src/test/resources/doubles.csv", ',', 0)
         assert(df("F1").isDouble)
         val parsed = df("F2").doubleRdd.collect()
         println(parsed.mkString(", "))
@@ -184,7 +185,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     test("Schema Dictate") {
-        val df = DF.fromFile(sc, "src/test/resources/doubles.csv", ',', true, 0, Map("F1" -> ColType.String))
+        val df = DF.fromFile(sc, "src/test/resources/doubles.csv", ',', 0, Map("F1" -> ColType.String))
         assert(df("F1").isString)
         df.list()
     }
