@@ -765,11 +765,11 @@ object DF {
           SchemaUtils.guessType(sc, columns(i))
         }
       } else {
-        ru.typeOf[String]
+        ColType.String
       }
       col.setName(s"$t/$inFile/${df.colIndexToName(i)}")
       println(s"Column: ${df.colIndexToName(i)} \t\t\tGuessed Type: ${t}")
-      if (t == ru.typeOf[Double]) {
+      if (t == ColType.Double) {
         df.cols.put(df.colIndexToName(i), Column.asDoubles(sc, col, i, df.defaultStorageLevel))
         col.unpersist()
       } else {

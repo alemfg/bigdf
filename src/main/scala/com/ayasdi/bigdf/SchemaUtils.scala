@@ -52,9 +52,9 @@ object SchemaUtils {
     }.count
 
     if (parseFailCount > 0)
-      ru.typeOf[String]
+      ColType.String
     else
-      ru.typeOf[Double]
+      ColType.Double
   }
 
   /**
@@ -69,9 +69,9 @@ object SchemaUtils {
     }.length
 
     if (parseFailCount > 0)
-      ru.typeOf[String]
+      ColType.String
     else
-      ru.typeOf[Double]
+      ColType.Double
   }
 
   /**
@@ -88,9 +88,9 @@ object SchemaUtils {
       }
     }
     if (parseErrors.value > 0)
-      ru.typeOf[String]
+      ColType.String
     else
-      ru.typeOf[Double]
+      ColType.String
   }
 
 }
