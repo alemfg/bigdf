@@ -7,7 +7,7 @@
 package com.ayasdi.bigdf
 
 import scala.reflect.runtime.{universe => ru}
-import scala.collection.immutable.HashMap
+import scala.collection.mutable.HashMap
 
 /**
  * Extend this class to do aggregations. Implement aggregate method.
@@ -78,9 +78,29 @@ case object AggMean extends Aggregator[Double, Tuple2[Double, Long], Double] {
   override def finalize(x: SumNCount) = x._1 / x._2
 }
 
+case object AggSum extends Aggregator[Double, Double, Double] {
+  def aggregate(a: Double, b: Double) = a + b
+}
+
+
 class AggString[W] extends Aggregator[String, Array[String], W] {
   override def convert(a: String) = Array(a.asInstanceOf[String])
   def aggregate(a: Array[String], b: Array[String]) = a ++ b
+}
+
+class AggCountString[W] extends Aggregator[String, HashMap[String, Float], W] {
+  override def convert(a: String) = HashMap(a -> 1.0F)
+  override def mergeValue(agg: HashMap[String, Float], a: String) = {
+    agg(a) = agg.getOrElse(a, 0.0F) + 1
+    agg
+  }
+  override def mergeCombiners(a: HashMap[String, Float], b: HashMap[String, Float]) = {
+    b.foreach { case (term, count) =>
+      a(term) = a.getOrElse(term, 0.0F) + 1
+    }
+    a
+  }
+  def aggregate(a: HashMap[String, Float], b: HashMap[String, Float]) = mergeCombiners(a, b)
 }
 
 case class AggMakeString(val sep: String = ",") extends AggString[String] {
