@@ -88,6 +88,8 @@ class AggString[W] extends Aggregator[String, Array[String], W] {
   def aggregate(a: Array[String], b: Array[String]) = a ++ b
 }
 
+case object AggArrayString extends AggString[Array[String]]
+
 class AggCountString[W] extends Aggregator[String, HashMap[String, Float], W] {
   override def convert(a: String) = HashMap(a -> 1.0F)
   override def mergeValue(agg: HashMap[String, Float], a: String) = {

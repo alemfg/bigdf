@@ -52,9 +52,14 @@ object FileUtils {
     def getRecursively(f: File): Seq[File] =
       f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles ++ List(f)
 
-    getRecursively(new File(path)).foreach{ f =>
-      if (!f.delete())
-        throw new RuntimeException("Failed to delete " + f.getAbsolutePath)}
+
+    val file = new File(path)
+    if(file.exists()) {
+      getRecursively(file).foreach { f =>
+        if (!f.delete())
+          throw new RuntimeException("Failed to delete " + f.getAbsolutePath)
+      }
+    }
   }
 
   def dirToFiles(path: String, recursive: Boolean = true)(implicit sc: SparkContext) = {

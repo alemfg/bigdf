@@ -478,6 +478,11 @@ case class DF private(val sc: SparkContext,
         aggtor.finalize(v)
       }.asInstanceOf[RDD[String]]
       newDf.update(aggdCol, Column(sc, col1, newDf.columnCount))
+    } else if(wtpe == classTag[Array[String]]) {
+      val col1 = aggedRdd.map { case (k, v) =>
+        aggtor.finalize(v)
+      }.asInstanceOf[RDD[Array[String]]]
+      newDf.update(aggdCol, Column(sc, col1, newDf.columnCount))
     } else {
       println("ERROR: aggregate value type" + wtpe)
     }
@@ -502,7 +507,7 @@ case class DF private(val sc: SparkContext,
    * @return new DF with first column aggByCol and second aggedCol
    */
   def aggregate[U: ClassTag, V: ClassTag, W: ClassTag]
-  (aggByCols: Seq[String], aggedCol: Seq[String], aggtor: Aggregator[U, V, W]) = {
+      (aggByCols: Seq[String], aggedCol: Seq[String], aggtor: Aggregator[U, V, W]) = {
     aggregateWithColumnStrategy(aggByCols, aggedCol.head, aggtor)
   }
 

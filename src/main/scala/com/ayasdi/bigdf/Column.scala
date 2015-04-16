@@ -30,6 +30,8 @@ object Preamble {
 
   implicit def columnShortToRichColumnCategory(col: Column[Short]) = new RichColumnCategory(col.castShort)
   implicit def columnAnyToRichColumnCategory(col: Column[Any]) = new RichColumnCategory(col.castShort)
+
+  implicit def columnAnyToRichColumnMap(col: Column[Any]) = new RichColumnMaps(col.castMapStringToFloat)
 }
 
 /*
@@ -178,7 +180,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   def head(max: Int): Array[String] = {
     colType match {
       case ColType.Double => {
-        if (count <= max)
+        if (count <= max)   //FIXME: avoid scanning all rows
           doubleRdd.collect
         else
           doubleRdd.take(max)
