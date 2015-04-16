@@ -95,8 +95,10 @@ case class DF private(val sc: SparkContext,
    * @param separator use this separator, default is comma
    */
   private[bigdf] def toCSV(separator: String = ",") = {
-    val rows = ColumnZipper.zipAndMap(columns()) { row => row.mkString(separator) }
+    val simpleCols = columns().filter { c => c.isDouble || c.isString }
+    val rows = ColumnZipper.zipAndMap(simpleCols) { row => row.mkString(separator) }
     val header = (0 until columnCount).map { colIndex => colIndexToName(colIndex) }
+                                      .filter { c =>  cols(c).isDouble || cols(c).isString }
                                       .mkString(separator)
     val headerRdd = sc.parallelize(Array(header))
     headerRdd.union(rows)
@@ -107,8 +109,12 @@ case class DF private(val sc: SparkContext,
    * @param file save DF in this file
    * @param separator use this separator, default is comma
    */
-  def writeToCSV(file: String, separator: String = ","): Unit = {
-    toCSV(separator).saveAsTextFile(file)
+  def writeToCSV(file: String, separator: String = ",", singlePart: Boolean = false): Unit = {
+    if(singlePart) {
+      toCSV(separator).coalesce(1).saveAsTextFile(file)
+    } else {
+      toCSV(separator).saveAsTextFile(file)
+    }
   }
 
   /**
@@ -648,11 +654,11 @@ case class DF private(val sc: SparkContext,
   /**
    * print brief description of the DF
    */
-  def describe(): Unit = {
+  def describe(detail: Boolean = false): Unit = {
     cols.foreach {
       case (name, col) =>
-        println(s"${name}:")
-        println(col.toString)
+        println(s"${name}\t\t\t${col.colType}\t\t\t${col.index}")
+        if(detail) println(col.toString)
     }
   }
 

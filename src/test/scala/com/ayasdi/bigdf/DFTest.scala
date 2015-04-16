@@ -378,7 +378,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         val df = makeDFFromCSVFile("src/test/resources/pivot.csv")
         df.list()
         val df2 = df.pivot("Customer", "Period")
-        df2.describe
+        df2.describe()
         df2.list()
         assert(df2.rowCount === 3)
         assert(df2.columnCount === 5)

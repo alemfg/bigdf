@@ -179,26 +179,11 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    */
   def head(max: Int): Array[String] = {
     colType match {
-      case ColType.Double => {
-        if (count <= max)   //FIXME: avoid scanning all rows
-          doubleRdd.collect
-        else
-          doubleRdd.take(max)
-      }.map { _.toString }
+      case ColType.Double => doubleRdd.take(max).map { _.toString }
         
-      case ColType.String => {
-          if (count <= max)
-            stringRdd.collect
-          else
-            stringRdd.take(max)
-      }
+      case ColType.String => stringRdd.take(max)
         
-      case _ => {
-        if (count <= max)
-          rdd.collect
-        else
-          rdd.take(max)
-      }.map { _.toString }
+      case _ => rdd.take(max).map { _.toString }
     }
   }
 
@@ -206,26 +191,12 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * print upto max(default 10) elements
    */
   def list(max: Int = 10): Unit = {
-    println("Count: $count")
     colType match {
-      case ColType.Double => {
-        if (count <= max)
-          doubleRdd.collect.foreach { println _ }
-        else
-          doubleRdd.take(max).foreach { println _ }
-      }
-      case ColType.String => {
-          if (count <= max)
-            stringRdd.collect.foreach { println _ }
-          else
-            stringRdd.take(max).foreach { println _ }
-      }
-      case _ => {
-        if (count <= max)
-          rdd.collect.foreach { println _ }
-        else
-          rdd.take(max).foreach { println _ }
-      }
+      case ColType.Double => doubleRdd.take(max).foreach(println)
+
+      case ColType.String => stringRdd.take(max).foreach(println)
+
+      case _ => rdd.take(max).foreach(println)
     }
   }
 
