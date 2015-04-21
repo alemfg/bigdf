@@ -9,7 +9,7 @@ import scala.collection.mutable.HashSet
 
 class RichColumnMaps[K, V](self: Column[Map[K, V]]) {
 
-  def expand(df: DF, keys: Set[String] = null): Unit = {
+  def expand(df: DF, keys: Set[String] = null, namePrefix: String = "expanded_"): Unit = {
     require(self.colType == ColType.MapOfStringToFloat)    //TODO: support can be added for others
 
     val ks = Option(keys) getOrElse {
@@ -21,8 +21,9 @@ class RichColumnMaps[K, V](self: Column[Map[K, V]]) {
          sparse.getOrElse(k, 0.0F).toDouble
       }
       newColRdd.name = s"expanded_${k}"
+      newColRdd.cache();
       val newCol = Column(self.sc, newColRdd)
-      df(s"expanded_${k}") = newCol
+      df(s"${namePrefix}${k}") = newCol
     }
   }
 

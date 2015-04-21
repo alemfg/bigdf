@@ -418,6 +418,8 @@ case class DF private(val sc: SparkContext,
     val aggedRdd = keyBy(aggdByCols, aggdCol).asInstanceOf[RDD[(List[Any], U)]]
       .combineByKey(aggtor.convert, aggtor.mergeValue, aggtor.mergeCombiners)
 
+    aggedRdd.cache()
+
     // columns of key
     var i = 0
     aggdByCols.foreach { aggdByCol =>
@@ -426,43 +428,43 @@ case class DF private(val sc: SparkContext,
         case ColType.Double => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Double]
-          }
+          }.cache()
           newDf.update(aggdByCol, Column(sc, col1, newDf.columnCount))
         }
         case ColType.Float => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Float]
-          }
+          }.cache()
           newDf.update(aggdByCol, Column(sc, col1, newDf.columnCount))
         }
         case ColType.Short => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Short]
-          }
+          }.cache()
           newDf.update(aggdByCol, Column(sc, col1, newDf.columnCount))
         }
         case ColType.String => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[String]
-          }
+          }.cache()
           newDf.update(aggdByCol, Column(sc, col1, newDf.columnCount))
         }
         case ColType.ArrayOfString => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Array[String]]
-          }
+          }.cache()
           newDf.update(aggdByCol, Column(sc, col1, newDf.columnCount))
         }
         case ColType.ArrayOfDouble => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Array[Double]]
-          }
+          }.cache()
           newDf.update(aggdByCol, Column(sc, col1, newDf.columnCount))
         }
         case ColType.MapOfStringToFloat => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Map[String, Float]]
-          }
+          }.cache()
           newDf.update(aggdByCol, Column(sc, col1, newDf.columnCount))
         }
         case ColType.Undefined => {
