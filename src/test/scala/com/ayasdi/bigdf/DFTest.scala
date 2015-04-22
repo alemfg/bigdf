@@ -8,13 +8,13 @@ package com.ayasdi.bigdf
 
 import java.nio.file.{Files, Paths}
 
-import com.ayasdi.bigdf.Preamble._
+import scala.collection.TraversableOnce.MonadOps
+
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.{SparkConf, SparkContext}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
-import scala.collection.TraversableOnce.MonadOps
-import scala.collection.immutable.HashMap
+import org.apache.spark.{SparkConf, SparkContext}
+import com.ayasdi.bigdf.implicits._
 
 class DFTest extends FunSuite with BeforeAndAfterAll {
     implicit var sc: SparkContext = _
@@ -151,22 +151,22 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         val df = makeDF
         val df2 = df.rename(Map("a" -> "aa", "b" -> "bb", "cc" -> "c"))
         assert((df eq df2) === true)
-        assert(df2.colIndexToName(0) === "aa")
-        assert(df2.colIndexToName(1) === "bb")
-        assert(df2.colIndexToName(2) === "c")
+        assert(df2.indexToColumnName(0) === "aa")
+        assert(df2.indexToColumnName(1) === "bb")
+        assert(df2.indexToColumnName(2) === "c")
 
         val df3 = makeDF
         val df4 = df3.rename(Map("a" -> "aa", "b" -> "bb", "cc" -> "c"), false)
         assert((df3 ne df4) === true)
-        assert(df4.colIndexToName(0) === "aa")
-        assert(df4.colIndexToName(1) === "bb")
-        assert(df4.colIndexToName(2) === "c")
+        assert(df4.indexToColumnName(0) === "aa")
+        assert(df4.indexToColumnName(1) === "bb")
+        assert(df4.indexToColumnName(2) === "c")
     }
 
     test("Parsing: Parse mixed doubles") {
         Config.SchemaGuessing.fastSamplingSize = 3
         val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv")
-        df.cols.foreach { col =>
+        df.nameToColumn.foreach { col =>
           col._2.colType match {
             case ColType.Double => col._2.doubleRdd.collect
             case _ => null
@@ -395,7 +395,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     test("toCSV") {
       val df = makeDF
-      val csvRows = df.toCSV().collect()
+      val csvRows = df.toCSV(cols = df.columnNames).collect()
       assert(csvRows(0) === "a,b,c,Date")
       assert(csvRows(1) === "11.0,21.0,31.0,1.36074391383E12")
       assert(csvRows(2) === "12.0,22.0,32.0,1.360616948975E12")

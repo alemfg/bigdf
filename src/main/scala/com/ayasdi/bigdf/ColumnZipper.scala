@@ -36,7 +36,7 @@ private[bigdf] object ColumnZipper {
    * @return RDD of columns zipped into Arrays
    */
   def makeRows(df: DF, indices: Seq[Int]): RDD[Array[Any]] = {
-    val cols = indices.map { colIndex => df.cols(df.colIndexToName(colIndex))}
+    val cols = indices.map { colIndex => df.nameToColumn(df.indexToColumnName(colIndex))}
     makeRows(cols)
   }
 

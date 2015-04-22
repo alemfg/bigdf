@@ -11,7 +11,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaRDD
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
-import Preamble._
+import implicits._
 import java.util.{ArrayList => JArrayList}
 import scala.collection.JavaConverters._
 

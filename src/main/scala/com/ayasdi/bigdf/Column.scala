@@ -19,7 +19,7 @@ import scala.reflect.{ClassTag, classTag}
  * For modularity column operations are grouped in several classes
  * Import these implicit conversions to make that seamless
  */
-object Preamble {
+object implicits {
   import scala.language.implicitConversions
 
   implicit def columnDoubleToRichColumnDouble(col: Column[Double]) = new RichColumnDouble(col)
@@ -113,6 +113,8 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
         null
       }
 
+  lazy val csvWritable = isDouble || isFloat || isShort || isString
+
   /**
    * Spark uses ClassTag but bigdf uses the more functional TypeTag. This method compares the two.
    * @tparam C classtag to compare
@@ -168,7 +170,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * print brief description of this column
    */
   def describe(): Unit = {
-    import com.ayasdi.bigdf.Preamble._
+    import com.ayasdi.bigdf.implicits._
     val c = if (rdd != null) count else 0
     println(s"\ttype:${colType}\n\tcount:${c}\n\tparseErrors:${parseErrors}")
     if(isDouble) castDouble.printStats
