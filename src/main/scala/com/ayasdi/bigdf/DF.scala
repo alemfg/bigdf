@@ -44,6 +44,7 @@ object JoinType extends Enumeration {
 case class DF private(val sc: SparkContext,
                       val nameToColumn: HashMap[String, Column[Any]] = new HashMap[String, Column[Any]],
                       val indexToColumnName: HashMap[Int, String] = new HashMap[Int, String],
+                      val options: Options,
                       val name: String) extends Dynamic {
   /**
    * number of rows in df, this cannot change. any operation that changes this returns a new df
@@ -64,12 +65,12 @@ case class DF private(val sc: SparkContext,
    * for large number of columns, column based filtering is faster. it is the default.
    * try changing this to true for DF with few columns
    */
-  var filterWithRowStrategy = Config.PerfParams.filterWithRowStrategy
+  var filterWithRowStrategy = options.perfTuningOpts.filterWithRowStrategy
 
   /**
    * default rdd caching storage level
    */
-  var defaultStorageLevel: StorageLevel = Config.PerfParams.storageLevel
+  var defaultStorageLevel: StorageLevel = options.perfTuningOpts.storageLevel
 
   private var rowsRddCached: Option[RDD[Array[Any]]] = None
   private def rowsRdd = {
@@ -265,7 +266,10 @@ case class DF private(val sc: SparkContext,
   }
 
   private def fromRows(rows: RDD[Array[Any]]) = {
-    val newDf = new DF(sc, indexToColumnName = this.indexToColumnName.clone, name = this.name + "-fromRows")
+    val newDf = new DF(sc,
+      indexToColumnName = this.indexToColumnName.clone,
+      name = this.name + "-fromRows",
+      options = this.options)
     //replace col.rdd in this df to get newDf
     this.nameToColumn.foreach { case(colName, col) =>
       val i = col.index
@@ -318,7 +322,8 @@ case class DF private(val sc: SparkContext,
    * rename columns, modify same DF or make a new one
    */
   def rename(columns: Map[String, String], inPlace: Boolean = true) = {
-    val df = if (inPlace == false) new DF(sc, nameToColumn.clone, indexToColumnName.clone, name) else this
+    val df = if (inPlace == false) new DF(sc, nameToColumn.clone, indexToColumnName.clone,
+      name = name, options = options) else this
 
     columns.foreach {
       case (oldName, newName) =>
@@ -422,7 +427,7 @@ case class DF private(val sc: SparkContext,
     val wtpe = classTag[W]
     if (aggtor != AggCount) require(nameToColumn(aggdCol).compareType(classTag[U]))
 
-    val newDf = DF(sc, s"${name}/${aggdCol}_aggby_${aggdByCols.mkString(";")}")
+    val newDf = DF(sc, s"${name}/${aggdCol}_aggby_${aggdByCols.mkString(";")}", options)
 
     val aggedRdd = keyBy(aggdByCols, aggdCol).asInstanceOf[RDD[(List[Any], U)]]
       .combineByKey(aggtor.convert, aggtor.mergeValue, aggtor.mergeCombiners)
@@ -568,7 +573,7 @@ case class DF private(val sc: SparkContext,
     val cleanedPivotedCols = pivotedCols.map { nameToColumn(_).index }
       .filter { colIndex => colIndex != nameToColumn(pivotByCol).index && colIndex != nameToColumn(keyCol).index  }
 
-    val newDf = DF(sc, s"${name}_${keyCol}_pivot_${pivotByCol}")
+    val newDf = DF(sc, s"${name}_${keyCol}_pivot_${pivotByCol}", options)
 
     /*
         add key column to output
@@ -725,12 +730,12 @@ object DF {
    * @param separator The field separator e.g. ',' for CSV file
    * @param nParts number of parts to process in parallel
    */
-  def apply(sc: SparkContext, inFile: String, separator: Char, nParts: Int): DF = {
-    if(FileUtils.isDir(inFile)(sc)) fromDir(sc, inFile, separator, nParts)
-    else fromFile(sc, inFile, separator, nParts)
+  def apply(sc: SparkContext, inFile: String, separator: Char, nParts: Int, options: Options): DF = {
+    if(FileUtils.isDir(inFile)(sc)) fromDir(sc, inFile, separator, nParts, options)
+    else fromFile(sc, inFile, separator, nParts, options = options)
   }
 
-  def fromDir(sc: SparkContext, inDir: String, separator: Char, nParts: Int): DF = {
+  def fromDir(sc: SparkContext, inDir: String, separator: Char, nParts: Int, options: Options): DF = {
     val files = FileUtils.dirToFiles(inDir)(sc)
     val numPartitions = if(nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
     val dfs = files.map { file => fromFile(sc, file, separator, numPartitions) }
@@ -746,8 +751,13 @@ object DF {
    * @param separator The field separator e.g. ',' for CSV file
    * @param nParts number of parts to process in parallel
    */
-  def fromFile(sc: SparkContext, inFile: String, separator: Char, nParts: Int, schema: Map[String, EnumVal] = Map()): DF = {
-    val df: DF = DF(sc, s"fromFile: $inFile")
+  def fromFile(sc: SparkContext,
+               inFile: String,
+               separator: Char,
+               nParts: Int = 0,
+               schema: Map[String, EnumVal] = Map(),
+               options: Options = Options()): DF = {
+    val df: DF = DF(sc, s"fromFile: $inFile", options)
     df.defaultStorageLevel = MEMORY_ONLY_SER //FIXME: allow changing this
     val file = if(nParts == 0) sc.textFile(inFile) else sc.textFile(inFile, nParts)
 
@@ -779,10 +789,10 @@ object DF {
     columns.foreach { col =>
       val t = if(schema.contains(header(i))) {
         schema.get(header(i)).get
-      } else if(Config.TextParsing.Number.enable) {
-        if (Config.SchemaGuessing.fastSamplingEnable) {
-          val firstFewRows = rows.take(Config.SchemaGuessing.fastSamplingSize)
-          SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) })
+      } else if(options.numberParsingOpts.enable) {
+        if (options.schemaGuessingOpts.fastSamplingEnable) {
+          val firstFewRows = rows.take(options.schemaGuessingOpts.fastSamplingSize)
+          SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) }, options.numberParsingOpts)
         } else {
           SchemaUtils.guessType(sc, columns(i))
         }
@@ -792,7 +802,8 @@ object DF {
       col.setName(s"$t/$inFile/${df.indexToColumnName(i)}")
       println(s"Column: ${df.indexToColumnName(i)} \t\t\tGuessed Type: ${t}")
       if (t == ColType.Double) {
-        df.nameToColumn.put(df.indexToColumnName(i), Column.asDoubles(sc, col, i, df.defaultStorageLevel))
+        df.nameToColumn.put(df.indexToColumnName(i),
+          Column.asDoubles(sc, col, i, df.defaultStorageLevel, options.numberParsingOpts))
         col.unpersist()
       } else {
         df.nameToColumn.put(df.indexToColumnName(i), Column(sc, col, i))
@@ -813,7 +824,7 @@ object DF {
       _.length
     }.toSet.size == 1, "Not a Vector of Vectors")
 
-    val df = DF(sc, "from_vector")
+    val df = DF(sc, "from_vector", Options())
     df.addHeader(header.toArray)
 
     var i = 0
@@ -838,7 +849,7 @@ object DF {
    * create a DF from a ColumnSeq
    */
   def apply(sc: SparkContext, colSeq: ColumnSeq): DF = {
-    val df = DF(sc, "colseq")
+    val df = DF(sc, "colseq", Options())
     val header = colSeq.cols.map {
       _._1
     }
@@ -860,7 +871,7 @@ object DF {
    * create a DF from a Column
    */
   def apply(sc: SparkContext, name: String, col: Column[Double]): DF = {
-    val df = DF(sc, "col")
+    val df = DF(sc, "col", Options())
     val i = df.addHeader(Array(name))
     df.nameToColumn.put(df.indexToColumnName(i - 1), col)
     df
@@ -890,14 +901,16 @@ object DF {
       }
     }
     println(cols)
-    new DF(df.sc, cols, df.indexToColumnName.clone, s"filtered_${df.name}")
+    new DF(df.sc, cols, df.indexToColumnName.clone,
+          name = s"filtered_${df.name}",
+          options = df.options)
   }
 
   /**
    * relational-like join two DFs
    */
   def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType = JoinType.Inner) = {
-    val newDf = DF(sc, s"${left.name}-join-${right.name}")
+    val newDf = DF(sc, s"${left.name}-join-${right.name}", left.options)
     val joinedRows = joinRdd(sc, left, right, on, how)
     val firstRow = joinedRows.first
 
@@ -980,8 +993,10 @@ object DF {
   /**
    * make an empty DF
    */
-  def apply(sc: SparkContext, name: String) = {
-    new DF(sc, new HashMap[String, Column[Any]], new HashMap[Int, String], name)
+  def apply(sc: SparkContext, name: String, options: Options) = {
+    new DF(sc, new HashMap[String, Column[Any]], new HashMap[Int, String],
+      name = name,
+      options = options)
   }
 
   def joinRdd(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType = JoinType.Inner) = {
@@ -1064,6 +1079,8 @@ object DF {
       cols(colName) = unionCol
     }
 
-    new DF(df.sc, cols, df.indexToColumnName.clone, s"filtered_${df.name}")
+    new DF(df.sc, cols, df.indexToColumnName.clone,
+      name = s"filtered_${df.name}",
+      options = df.options)
   }
 }

@@ -18,19 +18,19 @@ object SchemaUtils {
    * try to parse a string as a double
    * use Config.NumberParsing._ to handle exceptions
    */
-  def parseDouble(str: String): Double = {
-    if (str == null || str.isEmpty) Config.TextParsing.Number.emptyStrReplace.toDouble
-    else if (Config.TextParsing.Number.nans.contains(str)) Config.TextParsing.Number.nanValue
+  def parseDouble(str: String, opts: NumberParsingOpts): Double = {
+    if (str == null || str.isEmpty) opts.emptyStringReplace.toDouble
+    else if (opts.nanStrings.contains(str)) opts.nanValue
     else str.toDouble
   }
 
   /**
    *  try to parse a string as a double, count parse errors
    */
-  def parseDouble(parseErrors: Accumulator[Long], str: String): Double = {
+  def parseDouble(parseErrors: Accumulator[Long], str: String, opts: NumberParsingOpts): Double = {
     var y = Double.NaN
     try {
-      y = parseDouble(str)
+      y = parseDouble(str, opts)
     } catch {
       case _: java.lang.NumberFormatException => parseErrors += 1
     }
@@ -61,10 +61,10 @@ object SchemaUtils {
    * guess the type of a column by looking at the first few rows (for now 5)
    * only materializes the first few rows of first partition, hence faster
    */
-  def guessTypeByFirstFew(samples: Array[String]) = {
+  def guessTypeByFirstFew(samples: Array[String], opts: NumberParsingOpts) = {
     val parseFailCount = samples.filter { str =>
       Try {
-        parseDouble(str)
+        parseDouble(str, opts)
       }.toOption == None
     }.length
 

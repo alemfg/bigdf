@@ -498,11 +498,12 @@ object Column {
    * Parse an RDD of Strings into a Column of Doubles. Parse errors are counted in parseErrors field.
    * Items with parse failures become NaNs
    */
-  def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int, cacheLevel: StorageLevel) = {
+  def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int,
+                cacheLevel: StorageLevel, opts: NumberParsingOpts) = {
     val col = new Column[Double](sCtx, null, index)
     val parseErrors = col.parseErrors
 
-    val doubleRdd = stringRdd.map { x => SchemaUtils.parseDouble(parseErrors, x) }
+    val doubleRdd = stringRdd.map { x => SchemaUtils.parseDouble(parseErrors, x, opts) }
     doubleRdd.setName(s"${stringRdd.name}.toDouble").persist(cacheLevel)
     col.rdd = doubleRdd.asInstanceOf[RDD[Any]]
 

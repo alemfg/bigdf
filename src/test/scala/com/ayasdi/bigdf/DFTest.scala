@@ -66,12 +66,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
         DF(sc, h, v)
     }
 
-    private[bigdf] def makeDFFromCSVFile(file: String) = {
-        DF(sc, file, ',', 0)
+    private[bigdf] def makeDFFromCSVFile(file: String, options: Options = Options()) = {
+        DF(sc, file, ',', 0, options)
     }
 
-    private[bigdf] def makeDFFromCSVFile2(file: String) = {
-        DF(sc, file, ',', 2)
+    private[bigdf] def makeDFFromCSVFile2(file: String, options: Options = Options()) = {
+        DF(sc, file, ',', 2, options)
     }
 
     test("Construct: DF from Vector") {
@@ -164,8 +164,8 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     test("Parsing: Parse mixed doubles") {
-        Config.SchemaGuessing.fastSamplingSize = 3
-        val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv")
+        val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
+        val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
         df.nameToColumn.foreach { col =>
           col._2.colType match {
             case ColType.Double => col._2.doubleRdd.collect
@@ -176,12 +176,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     test("Parse doubles") {
-        val df = DF(sc, "src/test/resources/doubles.csv", ',', 0)
+        val df = DF(sc, "src/test/resources/doubles.csv", ',', 0, Options())
         assert(df("F1").isDouble)
         val parsed = df("F2").doubleRdd.collect()
         println(parsed.mkString(", "))
         assert(List(0, 2, 3, 4, 5, 6).forall { parsed(_).isNaN } )
-        assert(parsed(1) == 2.1)
+        assert(parsed(1) === 2.1)
     }
 
     test("Schema Dictate") {
@@ -200,7 +200,8 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     }
 
     test("Double to Categorical: errors") {
-        val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv")
+        val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
+        val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
         df("cat_f1") = df("Feature1").asCategorical
         df("cat_f1").shortRdd.collect
         assert(df("cat_f1").parseErrors.value === 2)
