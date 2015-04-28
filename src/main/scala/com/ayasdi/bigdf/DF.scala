@@ -38,13 +38,15 @@ object JoinType extends Enumeration {
  * Float
  * String
  * Category: stored as a Short category id
+ * Map: A column "family" or sparse columns i.e. most rows have "default" value for most columns
+ * Array: Generally an intermediate step in a transform that prepares several items for the next step
  */
 case class DF private(val sc: SparkContext,
                       val nameToColumn: HashMap[String, Column[Any]] = new HashMap[String, Column[Any]],
                       val indexToColumnName: HashMap[Int, String] = new HashMap[Int, String],
                       val name: String) extends Dynamic {
   /**
-   * number of rows in df
+   * number of rows in df, this cannot change. any operation that changes this returns a new df
    * @return number of rows
    */
   lazy val rowCount = {
@@ -62,12 +64,12 @@ case class DF private(val sc: SparkContext,
    * for large number of columns, column based filtering is faster. it is the default.
    * try changing this to true for DF with few columns
    */
-  var filterWithRowStrategy = false
+  var filterWithRowStrategy = Config.PerfParams.filterWithRowStrategy
 
   /**
    * default rdd caching storage level
    */
-  var defaultStorageLevel: StorageLevel = MEMORY_ONLY_SER
+  var defaultStorageLevel: StorageLevel = Config.PerfParams.storageLevel
 
   private var rowsRddCached: Option[RDD[Array[Any]]] = None
   private def rowsRdd = {
@@ -91,10 +93,11 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * convert the DF to an RDD of CSV Strings
+   * convert the DF to an RDD of CSV Strings. columns with compound types like Map, Array are skipped
    * @param separator use this separator, default is comma
+   * @param cols sequence of column names to include in output
    */
-  private[bigdf] def toCSV(separator: String = ",", cols: Seq[String]) = {
+  def toCSV(separator: String = ",", cols: Seq[String]) = {
     val writeColNames = cols.filter { nameToColumn(_).csvWritable }
     val writeCols = writeColNames.map(nameToColumn(_))
 
@@ -108,6 +111,7 @@ case class DF private(val sc: SparkContext,
    * save the DF to a text file
    * @param file save DF in this file
    * @param separator use this separator, default is comma
+   * @param singlePart save to a single partition to allow easy transfer to non-HDFS storage
    */
   def writeToCSV(file: String, separator: String = ",", singlePart: Boolean = false,
                  cols: Seq[String] = columnNames): Unit = {
@@ -171,7 +175,11 @@ case class DF private(val sc: SparkContext,
   /**
    * refer to a column 'c' in DF 'df' as df.c equivalent to df("c")
    */
-  def selectDynamic(colName: String) = column(colName)
+  def selectDynamic(colName: String) = {
+    val col = column(colName)
+    if(col == null) println(s"$colName does not match any DF API or column name")
+    col
+  }
 
   /**
    * get multiple columns identified by names
@@ -771,7 +779,7 @@ object DF {
     columns.foreach { col =>
       val t = if(schema.contains(header(i))) {
         schema.get(header(i)).get
-      } else if(Config.NumberParsing.enable) {
+      } else if(Config.TextParsing.Number.enable) {
         if (Config.SchemaGuessing.fastSamplingEnable) {
           val firstFewRows = rows.take(Config.SchemaGuessing.fastSamplingSize)
           SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) })

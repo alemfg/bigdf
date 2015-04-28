@@ -19,8 +19,8 @@ object SchemaUtils {
    * use Config.NumberParsing._ to handle exceptions
    */
   def parseDouble(str: String): Double = {
-    if (str == null || str.isEmpty) Config.NumberParsing.emptyStrReplace.toDouble
-    else if (Config.NumberParsing.nans.contains(str)) Config.NumberParsing.nanValue
+    if (str == null || str.isEmpty) Config.TextParsing.Number.emptyStrReplace.toDouble
+    else if (Config.TextParsing.Number.nans.contains(str)) Config.TextParsing.Number.nanValue
     else str.toDouble
   }
 
