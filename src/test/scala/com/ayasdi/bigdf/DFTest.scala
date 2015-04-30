@@ -14,7 +14,7 @@ import org.apache.log4j.{Level, Logger}
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.{SparkConf, SparkContext}
-import com.ayasdi.bigdf.implicits._
+import com.ayasdi.bigdf.Implicits._
 
 class DFTest extends FunSuite with BeforeAndAfterAll {
     implicit var sc: SparkContext = _

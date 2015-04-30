@@ -61,8 +61,8 @@ case class DoubleColumnWithDoubleScalarCondition(i: Int, val cmp: Double => Bool
   }
 }
 
-case class DoubleColumnWithDoubleColumnCondition(i: Int, j: Int,
-                                                 val cmp: (Double, Double) => Boolean) extends BinaryCondition(i, j) {
+case class DoubleColumnWithDoubleColumnCondition(i: Int, j: Int, val cmp: (Double, Double) => Boolean)
+  extends BinaryCondition(i, j) {
   def checkWithRowStrategy(row: Array[Any]) = {
     val elemLeft = row(colIndexLeft).asInstanceOf[Double]
     val elemRight = row(colIndexRight).asInstanceOf[Double]
@@ -86,8 +86,8 @@ case class StringColumnWithStringScalarCondition(i: Int,
   }
 }
 
-case class StringColumnWithStringColumnCondition(i: Int, j: Int,
-                                                 val cmp: (String, String) => Boolean) extends BinaryCondition(i, j) {
+case class StringColumnWithStringColumnCondition(i: Int, j: Int, val cmp: (String, String) => Boolean)
+  extends BinaryCondition(i, j) {
   def checkWithRowStrategy(row: Array[Any]) = {
     val elemLeft = row(colIndexLeft).asInstanceOf[String]
     val elemRight = row(colIndexRight).asInstanceOf[String]
@@ -144,14 +144,16 @@ case class DoubleColumnCondition(i: Int,
                                  val f: Double => Boolean) extends UnaryCondition(i) {
   def checkWithRowStrategy(row: Array[Any]) = f(row(colIndex).asInstanceOf[Double])
 
-  def checkWithColStrategy(cols: Array[Any], colMap: HashMap[Int, Int]) = f(cols(colMap(colIndex)).asInstanceOf[Double])
+  def checkWithColStrategy(cols: Array[Any], colMap: HashMap[Int, Int]) =
+    f(cols(colMap(colIndex)).asInstanceOf[Double])
 }
 
 case class StringColumnCondition(i: Int,
                                  val f: String => Boolean) extends UnaryCondition(i) {
   def checkWithRowStrategy(row: Array[Any]) = f(row(colIndex).asInstanceOf[String])
 
-  def checkWithColStrategy(cols: Array[Any], colMap: HashMap[Int, Int]) = f(cols(colMap(colIndex)).asInstanceOf[String])
+  def checkWithColStrategy(cols: Array[Any], colMap: HashMap[Int, Int]) =
+    f(cols(colMap(colIndex)).asInstanceOf[String])
 }
 
 

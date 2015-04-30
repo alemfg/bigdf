@@ -19,7 +19,7 @@ import scala.reflect.{ClassTag, classTag}
  * For modularity column operations are grouped in several classes
  * Import these implicit conversions to make that seamless
  */
-object implicits {
+object Implicits {
   import scala.language.implicitConversions
 
   implicit def columnDoubleToRichColumnDouble(col: Column[Double]) = new RichColumnDouble(col)
@@ -170,7 +170,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * print brief description of this column
    */
   def describe(): Unit = {
-    import com.ayasdi.bigdf.implicits._
+    import com.ayasdi.bigdf.Implicits._
     val c = if (rdd != null) count else 0
     println(s"\ttype:${colType}\n\tcount:${c}\n\tparseErrors:${parseErrors}")
     if(isDouble) castDouble.printStats
@@ -219,7 +219,8 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
     colType match {
       case ColType.Double => doubleRdd.filter { _.isNaN }.count
       case ColType.Float => floatRdd.filter { _.isNaN }.count
-      case ColType.Short => shortRdd.filter {  _ == RichColumnCategory.CATEGORY_NA }.count //short is used for categories
+      case ColType.Short => shortRdd.filter {  _ == RichColumnCategory.CATEGORY_NA }
+        .count //short is used for categories
       case ColType.String => stringRdd.filter { _.isEmpty }.count
       case _ => {
         println(s"WARNING: No NA defined for column type ${colType}")
@@ -534,7 +535,8 @@ object Column {
   }
 
   /**
-   * Map an RDD of Doubles into a Column of Shorts representing categories. Errors are counted in parseErrors field.
+   * Map an RDD of Doubles into a Column of Shorts representing categories.
+   * Errors are counted in parseErrors field.
    * Column of categories aka Categorical column has operations for categories like One Hot Encode etc
    */
   def asShorts(sCtx: SparkContext, doubleRdd: RDD[Double], index: Int, cacheLevel: StorageLevel) = {
