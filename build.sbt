@@ -1,6 +1,6 @@
 name := "bigdf"
 
-version := "0.2"
+version := "0.3"
 
 scalaVersion := "2.10.3"
 
@@ -16,10 +16,19 @@ libraryDependencies ++= Seq(
   "org.joda" % "joda-convert" % "1.3.1",
   "com.quantifind" %% "sumac" % "0.3.0",
   "org.scalatest" % "scalatest_2.10" % "2.0" % "test",
-  "com.univocity" % "univocity-parsers" % "1.5.1",
-  "org.apache.spark" %% "spark-core" % "1.3.1",
-  "org.apache.spark" %% "spark-sql" % "1.3.1"
-  //"org.apache.spark" % "spark-assembly" % "1.3.0-SNAPSHOT-hadoop2.5.0-cdh5.2.1"
+  "com.univocity" % "univocity-parsers" % "1.5.1"
+)
+
+libraryDependencies ++= Seq(
+  ("org.apache.spark" %% "spark-sql" % "1.3.1").
+    exclude("org.mortbay.jetty", "servlet-api").
+    exclude("commons-beanutils", "commons-beanutils-core").
+    exclude("commons-collections", "commons-collections").
+    exclude("commons-logging", "commons-logging").
+    exclude("org.slf4j", "slf4j-api").
+    exclude("org.apache.hadoop", "hadoop-yarn-api").
+    exclude("org.apache.hadoop", "hadoop-yarn-common").
+    exclude("com.esotericsoftware.minlog", "minlog")
 )
 
 resolvers ++= Seq(
