@@ -1,0 +1,8 @@
+language: scala
+jdk: oraclejdk7
+notifications: 
+  email:
+    recipients: 
+         - mohitjaggi@gmail.com
+    on_success: always
+    on_failure: always
