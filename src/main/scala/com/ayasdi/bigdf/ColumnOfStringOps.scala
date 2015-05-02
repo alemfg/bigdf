@@ -9,29 +9,34 @@ import org.apache.spark.SparkContext
 
 
 private case object ColumnOfStringsOps {
-  def withColumnOfDoubles(sc: SparkContext, a: Column[String], b: Column[Double], oper: (String, Double) => String) = {
+  def withColumnOfDoubles(sc: SparkContext, a: Column[String], b: Column[Double],
+                          oper: (String, Double) => String) = {
     val zipped = a.stringRdd.zip(b.doubleRdd)
     val result = zipped.map { x => oper(x._1, x._2)}
     Column(sc, result)
   }
 
-  def filterDouble(sc: SparkContext, a: Column[String], b: Double, oper: (String, Double) => Boolean) = {
+  def filterDouble(sc: SparkContext, a: Column[String], b: Double,
+                   oper: (String, Double) => Boolean) = {
     val result = a.stringRdd.filter { x => oper(x, b)}
     Column(sc, result)
   }
 
-  def withColumnOfString(sc: SparkContext, a: Column[String], b: Column[String], oper: (String, String) => String) = {
+  def withColumnOfString(sc: SparkContext, a: Column[String], b: Column[String],
+                         oper: (String, String) => String) = {
     val zipped = a.stringRdd.zip(b.stringRdd)
     val result = zipped.map { x => oper(x._1, x._2)}
     Column(sc, result)
   }
 
-  def withScalarDouble(sc: SparkContext, a: Column[String], b: Double, oper: (String, Double) => String) = {
+  def withScalarDouble(sc: SparkContext, a: Column[String], b: Double,
+                       oper: (String, Double) => String) = {
     val result = a.stringRdd.map { x => oper(x, b)}
     Column(sc, result)
   }
 
-  def withScalarString(sc: SparkContext, a: Column[String], b: String, oper: (String, String) => String) = {
+  def withScalarString(sc: SparkContext, a: Column[String], b: String,
+                       oper: (String, String) => String) = {
     val result = a.stringRdd.map { x => oper(x, b)}
     Column(sc, result)
   }
@@ -143,6 +148,8 @@ class RichColumnString(self: Column[String]) {
   def <(that: String) =
       new StringColumnWithStringScalarCondition(self.index, StringOps.ltFilter(that))
 
-  def +(that: String) = ColumnOfStringsOps.withScalarString(self.sc, self.castString, that, StringOps.addString)
-  def *(that: String) = ColumnOfStringsOps.withScalarDouble(self.sc, self.castString, that.toInt, StringOps.multiply)
+  def +(that: String) = ColumnOfStringsOps.withScalarString(
+    self.sc, self.castString, that, StringOps.addString)
+  def *(that: String) = ColumnOfStringsOps.withScalarDouble(
+    self.sc, self.castString, that.toInt, StringOps.multiply)
 }

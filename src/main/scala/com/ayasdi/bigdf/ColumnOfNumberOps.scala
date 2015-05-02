@@ -165,7 +165,8 @@ class RichColumnDouble(self: Column[Double]) {
 
   def printStats(): Unit = {
     println(s"\tmax:${stats.max}\n\tmin:${stats.min}\n\tcount:${stats.count}\n\tsum:${stats.sum}\n")
-    println(s"\tmean:${stats.mean}\n\tvariance(sample):${stats.sampleVariance}\n\tstddev(sample):${stats.sampleStdev}\n")
+    println(
+      s"\tmean:${stats.mean}\n\tvariance(sample):${stats.sampleVariance}\n\tstddev(sample):${stats.sampleStdev}\n")
     println(s"\tvariance:${stats.variance}\n\tstddev:${stats.stdev}")
   }
 

@@ -1,10 +1,15 @@
 /* Ayasdi Inc. Copyright 2014 - all rights reserved. */
 /**
  * @author mohit
- *         dataframe on spark
+ *         Some utility functions that have no good home
  */
 package com.ayasdi.bigdf
 
+import java.io.File
+
+import org.apache.log4j.{Logger, Level}
+
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 private[bigdf] object CountHelper {
@@ -44,46 +49,56 @@ private[bigdf] case class PivotHelper(grped: RDD[(Any, Iterable[Array[Any]])],
   }
 }
 
-private[bigdf] object ColumnZipper {
-  /**
-   * zip columns to get rows as lists
-   * @param df
-   * @param indices
-   * @return
-   */
-  def zip(df: DF, indices: Seq[Int]) = {
-    val arrays = apply(df, indices)
-    arrays.map {
-      _.toList
+object FileUtils {
+  def removeAll(path: String) = {
+    def getRecursively(f: File): Seq[File] =
+      f.listFiles.filter(_.isDirectory).flatMap(getRecursively) ++ f.listFiles ++ List(f)
+
+
+    val file = new File(path)
+    if(file.exists()) {
+      getRecursively(file).foreach { f =>
+        if (!f.delete())
+          throw new RuntimeException("Failed to delete " + f.getAbsolutePath)
+      }
     }
   }
 
-  /**
-   * zip columns to get rows as arrays
-   * @param df
-   * @param indices
-   * @return RDD of columns zipped into Arrays
-   */
-  def apply(df: DF, indices: Seq[Int]): RDD[Array[Any]] = {
-    val cols = indices.map { colIndex => df.cols(df.colIndexToName(colIndex))}
-    apply(cols)
-  }
-
-  /**
-   * zip columns to get rows as arrays
-   * @param cols
-   * @return RDD of columns zipped into Arrays
-   */
-  def apply(cols: Seq[Column[Any]]): RDD[Array[Any]] = {
-    val first = cols.head.rdd
-    val rest = cols.tail.map {
-      _.rdd
+  def dirToFiles(path: String, recursive: Boolean = true)(implicit sc: SparkContext) = {
+    import org.apache.hadoop.fs._
+    import scala.collection.mutable.MutableList
+    val fs = FileSystem.get(sc.hadoopConfiguration)
+    val files = fs.listFiles(new Path(path), recursive)
+    val fileList = MutableList[String]()
+    while(files.hasNext) {
+      val file = files.next
+      if(file.isFile) fileList += file.getPath.toUri.getPath
     }
 
-    //if you get a compile error here, you have the wrong spark
-    //get my forked version or patch yours from my pull request
-    //https://github.com/apache/spark/pull/2429
-    first.zip(rest)
+    fileList.toList
   }
 
+  def isDir(path: String)(implicit sc: SparkContext) = {
+    import org.apache.hadoop.fs._
+    val fs = FileSystem.get(sc.hadoopConfiguration)
+
+    fs.isDirectory(new Path(path))
+  }
+
+}
+
+object SparkUtil {
+  def silenceSpark {
+    setLogLevels(Level.WARN, Seq("spark", "org", "akka"))
+  }
+
+  def setLogLevels(level: org.apache.log4j.Level, loggers: TraversableOnce[String]) = {
+    loggers.map {
+      loggerName =>
+        val logger = Logger.getLogger(loggerName)
+        val prevLevel = logger.getLevel()
+        logger.setLevel(level)
+        loggerName -> prevLevel
+    }.toMap
+  }
 }

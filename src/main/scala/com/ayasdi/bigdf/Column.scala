@@ -1,21 +1,27 @@
 /* Ayasdi Inc. Copyright 2014 - all rights reserved. */
 /**
  * @author mohit
- *         dataframe on spark
+ *         Column in a dataframe. It stores the data for the column in an RDD.
+ *         A column can exist without being in a dataframe but usually it will be added to one
  */
 package com.ayasdi.bigdf
 
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 
 import scala.collection.mutable.HashMap
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 
-object Preamble {
+/**
+ * For modularity column operations are grouped in several classes
+ * Import these implicit conversions to make that seamless
+ */
+object Implicits {
   import scala.language.implicitConversions
+
   implicit def columnDoubleToRichColumnDouble(col: Column[Double]) = new RichColumnDouble(col)
   implicit def columnAnyToRichColumnDouble(col: Column[Any]) = new RichColumnDouble(col.castDouble)
 
@@ -24,6 +30,8 @@ object Preamble {
 
   implicit def columnShortToRichColumnCategory(col: Column[Short]) = new RichColumnCategory(col.castShort)
   implicit def columnAnyToRichColumnCategory(col: Column[Any]) = new RichColumnCategory(col.castShort)
+
+  implicit def columnAnyToRichColumnMap(col: Column[Any]) = new RichColumnMaps(col.castMapStringToFloat)
 }
 
 /*
@@ -53,8 +61,9 @@ object ColType {
 
 
 class Column[+T: ru.TypeTag] private(val sc: SparkContext,
-                                    var rdd: RDD[Any], /* mutates due to fillNA, markNA */
-                                    var index: Int) /* mutates when an orphan column is put in a DF */ {
+                                     var rdd: RDD[Any] = null,
+                                     var index: Int = -1,
+                                     name: String = "anon") {
   /**
    * set names for categories
    * FIXME: this should be somewhere else not in Column[T]
@@ -72,13 +81,13 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
      what is the column type?
    */
   val tpe = ru.typeOf[T]
-  private val isDouble = tpe =:= ru.typeOf[Double]
-  private val isFloat = tpe =:= ru.typeOf[Float]
-  private val isString = tpe =:= ru.typeOf[String]
-  private val isShort = tpe =:= ru.typeOf[Short]
-  private val isArrayOfString = tpe =:= ru.typeOf[Array[String]]
-  private val isArrayOfDouble = tpe =:= ru.typeOf[Array[Double]]
-  private val isMapOfStringToFloat = tpe =:= ru.typeOf[Map[String, Float]]
+  private[bigdf] val isDouble = tpe =:= ru.typeOf[Double]
+  private[bigdf] val isFloat = tpe =:= ru.typeOf[Float]
+  private[bigdf] val isString = tpe =:= ru.typeOf[String]
+  private[bigdf] val isShort = tpe =:= ru.typeOf[Short]
+  private[bigdf] val isArrayOfString = tpe =:= ru.typeOf[Array[String]]
+  private[bigdf] val isArrayOfDouble = tpe =:= ru.typeOf[Array[Double]]
+  private[bigdf] val isMapOfStringToFloat = tpe =:= ru.typeOf[Map[String, Float]]
 
   /*
       use this for demux'ing in column type
@@ -92,6 +101,20 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       else if(isMapOfStringToFloat) ColType.MapOfStringToFloat
       else if(isArrayOfDouble) ColType.ArrayOfDouble
       else ColType.Undefined
+
+  val sqlType: DataType = if(isDouble) DoubleType
+      else if(isFloat) FloatType
+      else if(isShort) ShortType
+      else if(isString) StringType
+      else if(isArrayOfString) ArrayType(StringType)
+      else if(isMapOfStringToFloat) MapType(StringType, FloatType)
+      else if(isArrayOfDouble) ArrayType(DoubleType)
+      else {
+        throw new Exception("Unknown column type")
+        null
+      }
+
+  lazy val csvWritable = isDouble || isFloat || isShort || isString
 
   /**
    * Spark uses ClassTag but bigdf uses the more functional TypeTag. This method compares the two.
@@ -148,54 +171,47 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * print brief description of this column
    */
   def describe(): Unit = {
-    import com.ayasdi.bigdf.Preamble._
+    import com.ayasdi.bigdf.Implicits._
     val c = if (rdd != null) count else 0
     println(s"\ttype:${colType}\n\tcount:${c}\n\tparseErrors:${parseErrors}")
     if(isDouble) castDouble.printStats
   }
 
   /**
+   * get the upto max entries in the column as strings
+   */
+  def head(max: Int): Array[String] = {
+    colType match {
+      case ColType.Double => doubleRdd.take(max).map { _.toString }
+        
+      case ColType.String => stringRdd.take(max)
+        
+      case _ => rdd.take(max).map { _.toString }
+    }
+  }
+
+  /**
    * print upto max(default 10) elements
    */
   def list(max: Int = 10): Unit = {
-    println("Count: $count")
     colType match {
-      case ColType.Double => {
-        if (count <= max)
-          doubleRdd.collect.foreach { println _ }
-        else
-          doubleRdd.take(max).foreach { println _ }
-      }
-      case ColType.String => {
-        {
-          if (count <= max)
-            stringRdd.collect.foreach { println _ }
-          else
-            stringRdd.take(max).foreach { println _ }
-        }
-      }
-      case _ => {
-        if (count <= max)
-          rdd.collect.foreach { println _ }
-        else
-          rdd.take(max).foreach { println _ }
-      }
+      case ColType.Double => doubleRdd.take(max).foreach(println)
+
+      case ColType.String => stringRdd.take(max).foreach(println)
+
+      case _ => rdd.take(max).foreach(println)
     }
   }
 
   /**
    * distinct
    */
-  def distinct = {
-    rdd.distinct
-  }
+  def distinct = rdd.distinct
 
   /**
    * does the column have any NA
    */
-  def hasNA = {
-    countNA > 0
-  }
+  def hasNA = countNA > 0
 
   /**
    * count the number of NAs
@@ -204,7 +220,8 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
     colType match {
       case ColType.Double => doubleRdd.filter { _.isNaN }.count
       case ColType.Float => floatRdd.filter { _.isNaN }.count
-      case ColType.Short => shortRdd.filter {  _ == RichColumnCategory.CATEGORY_NA }.count //short is used for categories
+      case ColType.Short => shortRdd.filter {  _ == RichColumnCategory.CATEGORY_NA }
+        .count //short is used for categories
       case ColType.String => stringRdd.filter { _.isEmpty }.count
       case _ => {
         println(s"WARNING: No NA defined for column type ${colType}")
@@ -212,7 +229,6 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       }
     }
   }
-
 
   /**
    * get rdd of doubles to use doublerddfunctions etc
@@ -329,7 +345,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * compare two columns
    */
-  def ==(that: Column[_]): Predicate = {
+  def ===(that: Column[_]): Predicate = {
     if (isDouble && that.isDouble)
       new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.eqColumn)
     else if (isString && that.isString)
@@ -386,7 +402,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * compare every element in this column of doubles with a double
    */
-  def ==(that: Double) = {
+  def ===(that: Double) = {
     if (isDouble)
       new DoubleColumnWithDoubleScalarCondition(index, DoubleOps.eqFilter(that))
     else
@@ -396,7 +412,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * compare every element in this column of string with a string
    */
-  def ==(that: String) = {
+  def ===(that: String) = {
     if (isString)
       new StringColumnWithStringScalarCondition(index, StringOps.eqFilter(that))
     else
@@ -443,12 +459,13 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * apply a given function to a column to generate a new column
    * the new column does not belong to any DF automatically
+   * FIXME: other column types
    */
   def map[U: ClassTag](mapper: Any => U) = {
     val mapped = if (isDouble) {
-      doubleRdd.map { row => mapper(row)}
+      doubleRdd.map { row => mapper(row) }
     } else {
-      stringRdd.map { row => mapper(row)}
+      stringRdd.map { row => mapper(row) }
     }
     if (classTag[U] == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
@@ -479,25 +496,26 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
 }
 
 object Column {
-  def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int, cacheLevel: StorageLevel) = {
+  /**
+   * Parse an RDD of Strings into a Column of Doubles. Parse errors are counted in parseErrors field.
+   * Items with parse failures become NaNs
+   */
+  def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int,
+                cacheLevel: StorageLevel, opts: NumberParsingOpts) = {
     val col = new Column[Double](sCtx, null, index)
     val parseErrors = col.parseErrors
 
-    val doubleRdd = stringRdd.map { x =>
-      var y = Double.NaN
-      try {
-        y = x.toDouble
-      } catch {
-        case _: java.lang.NumberFormatException => parseErrors += 1
-      }
-      y
-    }
+    val doubleRdd = stringRdd.map { x => SchemaUtils.parseDouble(parseErrors, x, opts) }
     doubleRdd.setName(s"${stringRdd.name}.toDouble").persist(cacheLevel)
     col.rdd = doubleRdd.asInstanceOf[RDD[Any]]
 
     col
   }
 
+  /**
+   * Parse an RDD of Strings into a Column of Floats. Parse errors are counted in parseErrors field
+   * Items with parse failures become NaNs
+   */
   def asFloats(sCtx: SparkContext, stringRdd: RDD[String], index: Int, cacheLevel: StorageLevel) = {
     val col = new Column[Float](sCtx, null, index)
     val parseErrors = col.parseErrors
@@ -517,6 +535,11 @@ object Column {
     col
   }
 
+  /**
+   * Map an RDD of Doubles into a Column of Shorts representing categories.
+   * Errors are counted in parseErrors field.
+   * Column of categories aka Categorical column has operations for categories like One Hot Encode etc
+   */
   def asShorts(sCtx: SparkContext, doubleRdd: RDD[Double], index: Int, cacheLevel: StorageLevel) = {
     val col = new Column[Short](sCtx, null, index)
     val parseErrors = col.parseErrors

@@ -21,26 +21,10 @@ $ brew install maven
 $ brew install scala
 $ brew install sbt
 ```
-- Get patched Spark from [https://github.com/AyasdiOpenSource/spark] [A minor patch is needed on Spark to make bigdf more efficient. A pull request has been submitted and when it is merged you can use regular Spark distribution] 
-```sh
-$ cd $REPOS
-$ git clone https://github.com/AyasdiOpenSource/spark.git
-```
-- Build Spark using the following commands
-```sh
-$ cd spark
-$ export MAVEN_OPTS="-Xmx2g -XX:MaxPermSize=512M -XX:ReservedCodeCacheSize=512m"
-$ mvn -Dhadoop.version=2.0.0-mr1-cdh4.2.0 \
--DskipTests clean package
-```
 - clone the bigdf repo
 ```sh
 $ cd $REPOS
 $ git clone git@bitbucket.org:ayasdi/bigdf.git
-```
-- copy spark assembly jar(after bulding it) to bigdf/lib
-```sh
-$ cp spark/assembly/target/scala-2.xx/spark-assembly-1.2.0-SNAPSHOT-hadoop2.0.0-mr1-cdh4.2.0.jar bigdf/lib
 ```
 - sbt update, package, and test(optional) in the bigdf directory.
 ```sh
@@ -51,7 +35,7 @@ $ sbt assembly
 $ sbt test #this might fail, but will pass from eclipse and intellij
 
 ```
-- Start a shell and begin playing.
+- Start a shell and begin playing. You need spark 1.3.1
 ```sh
 $ cd $REPOS
 $ ./spark/bin/spark-shell --jars ./bigdf/target/scala-2.10/bigdf-assembly-*.jar
