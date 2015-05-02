@@ -2,7 +2,7 @@ name := "bigdf"
 
 version := "0.3"
 
-scalaVersion := "2.10.3"
+scalaVersion := "2.10.4"
 
 scalacOptions += "-feature"
 
@@ -19,9 +19,17 @@ libraryDependencies ++= Seq(
   "com.univocity" % "univocity-parsers" % "1.5.1"
 )
 
+//
+//libraryDependencies ++=  Seq(
+//  ("org.apache.hadoop" % "hadoop-client" % "2.5.0-cdh5.2.1").
+//    exclude("org.slf4j", "slf4j-api").
+//    exclude("javax.")
+//)
+
+
 libraryDependencies ++= Seq(
   ("org.apache.spark" %% "spark-sql" % "1.3.1").
-    exclude("org.mortbay.jetty", "servlet-api").
+//    exclude("org.mortbay.jetty", "servlet-api").
     exclude("commons-beanutils", "commons-beanutils-core").
     exclude("commons-collections", "commons-collections").
     exclude("commons-logging", "commons-logging").
@@ -31,12 +39,13 @@ libraryDependencies ++= Seq(
     exclude("com.esotericsoftware.minlog", "minlog")
 )
 
+resolvers += "Cloudera Repository" at "https://repository.cloudera.com/artifactory/cloudera-repos/"
+
 resolvers ++= Seq(
   // other resolvers here
   // if you want to use snapshot builds (currently 0.8-SNAPSHOT), use this.
   //"Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots/",
-  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/releases/",
-  "Local Maven Repository" at "file:///" + Path.userHome + ".m2/repository"
+  "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/releases/"
 )
 
 publishMavenStyle := true

@@ -61,8 +61,9 @@ object ColType {
 
 
 class Column[+T: ru.TypeTag] private(val sc: SparkContext,
-                                    var rdd: RDD[Any], /* mutates due to fillNA, markNA */
-                                    var index: Int) /* mutates when an orphan column is put in a DF */ {
+                                     var rdd: RDD[Any] = null,
+                                     var index: Int = -1,
+                                     name: String = "anon") {
   /**
    * set names for categories
    * FIXME: this should be somewhere else not in Column[T]

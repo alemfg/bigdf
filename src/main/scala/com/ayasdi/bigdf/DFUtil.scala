@@ -7,6 +7,8 @@ package com.ayasdi.bigdf
 
 import java.io.File
 
+import org.apache.log4j.{Logger, Level}
+
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
@@ -83,4 +85,20 @@ object FileUtils {
     fs.isDirectory(new Path(path))
   }
 
+}
+
+object SparkUtil {
+  def silenceSpark {
+    setLogLevels(Level.WARN, Seq("spark", "org", "akka"))
+  }
+
+  def setLogLevels(level: org.apache.log4j.Level, loggers: TraversableOnce[String]) = {
+    loggers.map {
+      loggerName =>
+        val logger = Logger.getLogger(loggerName)
+        val prevLevel = logger.getLevel()
+        logger.setLevel(level)
+        loggerName -> prevLevel
+    }.toMap
+  }
 }
