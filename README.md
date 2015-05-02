@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/AyasdiOpenSource/bigdf.svg?branch=master)](https://travis-ci.org/AyasdiOpenSource/bigdf)
+
 ### Introduction
 DataFrames are useful constructs for data scientists, popularized by [R] and [pandas].
 
