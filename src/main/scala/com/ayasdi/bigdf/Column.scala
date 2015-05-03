@@ -168,7 +168,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   }
 
   /**
-   * print brief description of this column
+   * print brief description of this column, processes the whole column
    */
   def describe(): Unit = {
     import com.ayasdi.bigdf.Implicits._
@@ -182,10 +182,9 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    */
   def head(max: Int): Array[String] = {
     colType match {
-      case ColType.Double => doubleRdd.take(max).map { _.toString }
-        
-      case ColType.String => stringRdd.take(max)
-        
+      case ColType.Double | ColType.Float  => doubleRdd.take(max).map { d => f"$d%8.4f" }
+      case ColType.String => stringRdd.take(max).map { s => f"$s%20s"}
+//FIXME:      case ColType.Short => shortRdd.take(max).map { s => f"$s%3d"}
       case _ => rdd.take(max).map { _.toString }
     }
   }
@@ -193,18 +192,11 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * print upto max(default 10) elements
    */
-  def list(max: Int = 10): Unit = {
-    colType match {
-      case ColType.Double => doubleRdd.take(max).foreach(println)
-
-      case ColType.String => stringRdd.take(max).foreach(println)
-
-      case _ => rdd.take(max).foreach(println)
-    }
-  }
+  def list(max: Int = 10): Unit = head(max).foreach(println)
 
   /**
    * distinct
+   * FIXME: should this return a column?
    */
   def distinct = rdd.distinct
 
@@ -224,8 +216,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
         .count //short is used for categories
       case ColType.String => stringRdd.filter { _.isEmpty }.count
       case _ => {
-        println(s"WARNING: No NA defined for column type ${colType}")
-        0L
+        throw new RuntimeException(s"ERROR: No NA defined for column type ${colType}")
       }
     }
   }
@@ -277,6 +268,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
 
   /**
    * transform column of doubles to a categorical column (column of shorts)
+   * FIXME: improve this
    */
   def asCategorical = {
     require(isDouble)
@@ -473,7 +465,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       Column(sc, mapped.asInstanceOf[RDD[String]])
   }
 
-  def num_map[U: ClassTag](mapper: Double => U) = {
+  def dbl_map[U: ClassTag](mapper: Double => U) = {
     val mapped = if (isDouble) {
       doubleRdd.map { row => mapper(row)}
     }
