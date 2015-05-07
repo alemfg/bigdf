@@ -4,8 +4,9 @@
 
 package com.ayasdi.bigdf.readers
 
-import java.io.StringReader
 import com.univocity.parsers.csv._
+
+import com.ayasdi.bigdf.LineExceptionPolicy
 
 abstract class CsvReader(fieldSep: Char = ',',
                          lineSep: String = "\n",
@@ -60,12 +61,7 @@ class LineCsvReader(fieldSep: Char = ',',
    * @param line a String with no newline at the end
    * @return array of strings where each string is a field in the CSV record
    */
-  def parseLine(line: String): Array[String] = {
-    parser.beginParsing(new StringReader(line))
-    val parsed = parser.parseNext()
-    parser.stopParsing()
-    parsed
-  }
+  def parseLine(line: String): Array[String] = parser.parseLine(line)
 }
 
 /**
@@ -80,9 +76,12 @@ class BulkCsvReader (iter: Iterator[String],
                      escape: Char = '\\',
                      ignoreLeadingSpace: Boolean = true,
                      ignoreTrailingSpace: Boolean = true,
+                     badLinePolicy: LineExceptionPolicy.EnumVal,
+                     fillValue: String,
                      headers: Seq[String] = null,
                      inputBufSize: Int = 128,
-                     maxCols: Int = 20480)
+                     maxCols: Int = 20480,
+                     numFields: Int)
   extends CsvReader(fieldSep,
     lineSep,
     quote,
@@ -94,9 +93,43 @@ class BulkCsvReader (iter: Iterator[String],
     maxCols)
   with Iterator[Array[String]] {
 
-  val reader = new StringIteratorReader(iter, lineSep)
-  parser.beginParsing(reader)
-  var nextRecord =  parser.parseNext()
+  def tryNext = {
+    var fields: Array[String] = null
+    var continue = true
+    try {
+      do {
+        fields = parser.parseLine(iter.next)
+        if (fields == null || fields.length == numFields) {   //FIXME: can parseLine return null?
+          continue = false
+        } else {
+          continue = badLinePolicy match {
+            case LineExceptionPolicy.Ignore => true
+            case LineExceptionPolicy.Abort => throw new RuntimeException("Bad line encountered, aborting")
+            case LineExceptionPolicy.Fill => {
+              // wrong number of fields, fill or truncate
+              val diff = fields.length - numFields
+              if (diff < 0) {
+                // missing fields, fill
+                fields = fields.padTo(numFields, fillValue)
+                println(s"$numFields ${fields.length}")
+              }
+              else if (diff > 0)
+                fields = fields.take(numFields) //extra fields, truncate
+              else
+                throw new RuntimeException("Cannot get here!")
+
+              false
+            }
+          }
+        }
+      } while (continue) // until a good row is read
+    } catch {
+      case nse: NoSuchElementException => fields = null // end of data
+    }
+    fields
+  }
+
+  var nextRecord = tryNext
 
   /**
    * get the next parsed line.
@@ -105,7 +138,7 @@ class BulkCsvReader (iter: Iterator[String],
   def next = {
     val curRecord = nextRecord
     if(curRecord != null)
-      nextRecord = parser.parseNext()
+      nextRecord = tryNext
     else
       throw new NoSuchElementException("next record is null")
     curRecord

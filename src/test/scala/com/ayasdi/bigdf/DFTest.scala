@@ -10,7 +10,7 @@ import java.nio.file.{Files, Paths}
 
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
-import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.{SparkException, SparkConf, SparkContext}
 import com.ayasdi.bigdf.Implicits._
 
 class DFTest extends FunSuite with BeforeAndAfterAll {
@@ -91,11 +91,28 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df2.rowCount === 4)
   }
 
-  test("Construct: DF from CSV file with missing fields and fromFile API") {
-   // val df = DF.fromFile(sc, "src/test/resources/missing.csv", ',', 0, options = Options())
-   // FIXME: support this option
-   // assert(df.columnCount === 4)
-   // assert(df.rowCount === 3)
+  test("Construct: DF from CSV file with missing fields, ignore policy") {
+    val df = DF.fromFile(sc, "src/test/resources/missingFields.csv", ',', 0,
+      options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Fill)))
+    df.list()
+    assert(df.columnCount === 3)
+    assert(df.rowCount === 8)
+  }
+
+  test("Construct: DF from CSV file with missing fields, fill policy") {
+    val df = DF.fromFile(sc, "src/test/resources/missingFields.csv", ',', 0, options = Options())
+    df.list()
+    assert(df.columnCount === 3)
+    assert(df.rowCount === 2)
+  }
+
+  test("Construct: DF from CSV file with missing fields, abort policy") {
+    val exception = intercept[SparkException] {
+      val df = DF.fromFile(sc, "src/test/resources/missingFields.csv", ',', 0,
+        options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Abort)))
+      df.list()
+    }
+    assert(exception.getMessage.contains("Bad line encountered, aborting"))
   }
 
   test("Construct: DF from directory of CSV files") {

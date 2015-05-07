@@ -805,7 +805,7 @@ object DF {
    */
   def fromFile(sc: SparkContext,
                inFile: String,
-               separator: Char,
+               separator: Char,  //FIXME: move to options
                nParts: Int = 0,
                schema: Map[String, EnumVal] = Map(),
                options: Options = Options()): DF = {
@@ -814,7 +814,12 @@ object DF {
 
     // parse header line
     val firstLine = file.first
-    val header = new LineCsvReader(separator).parseLine(firstLine)
+    val header = new LineCsvReader(fieldSep = separator,
+      ignoreLeadingSpace = options.csvParsingOpts.ignoreLeadingWhitespace,
+      ignoreTrailingSpace = options.csvParsingOpts.ignoreTrailingWhiteSpace,
+      quote = options.csvParsingOpts.quoteChar,
+      escape = options.csvParsingOpts.escapeChar
+    ).parseLine(firstLine)
     println(s"Found ${header.size} columns in header")
     df.addHeader(header)
 
@@ -826,7 +831,15 @@ object DF {
 
     val rows = dataLines.mapPartitionsWithIndex({
       case (split, iter) => {
-        new BulkCsvReader(iter, split, separator)
+        new BulkCsvReader(iter, split,
+          fieldSep = separator,
+          ignoreLeadingSpace = options.csvParsingOpts.ignoreLeadingWhitespace,
+          ignoreTrailingSpace = options.csvParsingOpts.ignoreTrailingWhiteSpace,
+          quote = options.csvParsingOpts.quoteChar,
+          escape = options.csvParsingOpts.escapeChar,
+          numFields = header.size,
+          badLinePolicy = options.lineParsingOpts.badLinePolicy,
+          fillValue = options.lineParsingOpts.fillValue)
       }
     }, true).persist(df.storageLevel)
 

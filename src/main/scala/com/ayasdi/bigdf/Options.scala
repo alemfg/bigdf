@@ -69,7 +69,8 @@ case class LineParsingOpts(val badLinePolicy: LineExceptionPolicy.EnumVal = Line
  * @param ignoreLeadingWhitespace ignore white space before a field
  * @param ignoreTrailingWhiteSpace ignore white space after a field
  */
-case class CSVParsingOpts(val quoteChar: Char = '"',
+case class CSVParsingOpts(val delimiter: Char = ',',
+                          val quoteChar: Char = '"',
                           val escapeChar: Char = '\\',
                           val ignoreLeadingWhitespace: Boolean = true,
                           val ignoreTrailingWhiteSpace: Boolean = true)
