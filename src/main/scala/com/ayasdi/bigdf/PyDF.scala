@@ -5,15 +5,15 @@
  */
 package com.ayasdi.bigdf
 
-import collection.JavaConversions._
-import org.apache.spark.BigDFPyRDD
-import org.apache.spark.SparkContext
-import org.apache.spark.api.java.JavaRDD
-import scala.reflect.runtime.{universe => ru}
-import scala.reflect.{ClassTag, classTag}
-import Implicits._
 import java.util.{ArrayList => JArrayList}
+
+import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
+import scala.reflect.runtime.{universe => ru}
+
+import org.apache.spark.{BigDFPyRDD, SparkContext}
+import org.apache.spark.api.java.JavaRDD
+import com.ayasdi.bigdf.Implicits._
 
 case class PyDF(df: DF) {
   def columnNames = df.columnNames
@@ -57,7 +57,7 @@ case class PyDF(df: DF) {
 }
 
 object PyDF {
-  def fromCSV(sc: SparkContext, name: String, separator: String, fasterGuess: Boolean, nParts: Int = 0): PyDF = {
+  def fromCSV(sc: SparkContext, name: String, separator: String, fasterGuess: Boolean, nParts: Int): PyDF = {
     val sep: Char = separator.charAt(0)
     PyDF(DF(sc, name, sep, nParts, Options()))
   }
