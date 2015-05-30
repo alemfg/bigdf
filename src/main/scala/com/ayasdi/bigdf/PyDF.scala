@@ -9,10 +9,12 @@ import java.util.{ArrayList => JArrayList}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
+import scala.reflect._
 import scala.reflect.runtime.{universe => ru}
 
-import org.apache.spark.{BigDFPyRDD, SparkContext}
 import org.apache.spark.api.java.JavaRDD
+import org.apache.spark.rdd.RDD
+import org.apache.spark.{BigDFPyRDD, SparkContext}
 import com.ayasdi.bigdf.Implicits._
 
 case class PyDF(df: DF) {
@@ -29,12 +31,12 @@ case class PyDF(df: DF) {
   def update(name: String, pycol: PyColumn[_]) = {
     df.update(name, pycol.col)
   }
-  
+
   def rowCount = df.rowCount
-  
+
   def colCount = df.colCount
-  
-  def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String) : PyDF = {
+
+  def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String): PyDF = {
     val byColumn = byColumnJ.asScala.toList
     val aggrColumn = aggrColumnJ.asScala.toList
     val dfAgg = aggregator match {
@@ -45,14 +47,14 @@ case class PyDF(df: DF) {
     }
     PyDF(dfAgg)
   }
-  
+
   def groupBy(colName: String) = df.groupBy(colName)
-  
+
   def pivot(keyCol: String, pivotByCol: String,
             pivotedCols: JArrayList[String]): PyDF = {
     PyDF(df.pivot(keyCol, pivotByCol, pivotedCols.asScala.toList))
   }
-  
+
   def writeToCSV(file: String, separator: String = ","): Unit = df.writeToCSV(file, separator)
 }
 
@@ -65,11 +67,12 @@ object PyDF {
 
 case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   def list(numRows: Int) = col.list(numRows)
+
   override def toString = {
     val name = s"${col.rdd.name}".split('/').last.split('.').head
     s"$name\t${col.colType}"
   }
-  
+
   def tpe = s"${col.colType}"
 
   def stats = {
@@ -79,50 +82,60 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
         val stats = rcol.stats
 
         mapAsJavaMap(Map("min" -> stats.min,
-            "max" -> stats.max,
-            "mean" -> stats.mean,
-            "std" -> stats.stdev,
-            "var" -> stats.variance,
-            "count" -> stats.count
-            ))
+          "max" -> stats.max,
+          "mean" -> stats.mean,
+          "std" -> stats.stdev,
+          "var" -> stats.variance,
+          "count" -> stats.count
+        ))
       case _ => null
     }
   }
 
-  def javaToPython : JavaRDD[Array[Byte]] = {
+  def javaToPython: JavaRDD[Array[Byte]] = {
     col.colType match {
-      case ColType.Double => BigDFPyRDD.pythonRDD(col.rdd)      
+      case ColType.Double => BigDFPyRDD.pythonRDD(col.rdd)
       case _ => null
     }
   }
 
-  def pythonToJava(c : JavaRDD[Array[Byte]]) = {
-      val jrdd : JavaRDD[Double] = BigDFPyRDD.javaRDD(c)
-      val newCol = Column(col.sc, jrdd.rdd, 0)
-      PyColumn(newCol)
+  def pythonToJava(c: JavaRDD[Array[Byte]]) = {
+    val jrdd: JavaRDD[Double] = BigDFPyRDD.javaRDD(c)
+    val newCol = Column(col.sc, jrdd.rdd, 0)
+    PyColumn(newCol)
   }
 
   def add(v: Double) = {
-    val rcol : RichColumnDouble = col
+    val rcol: RichColumnDouble = col
     PyColumn(rcol + v)
   }
 
   def sub(v: Double) = {
-    val rcol : RichColumnDouble = col
+    val rcol: RichColumnDouble = col
     PyColumn(rcol - v)
   }
 
   def mul(v: Double) = {
-    val rcol : RichColumnDouble = col
+    val rcol: RichColumnDouble = col
     PyColumn(rcol * v)
   }
 
   def div(v: Double) = {
-    val rcol : RichColumnDouble = col
+    val rcol: RichColumnDouble = col
     PyColumn(rcol / v)
   }
 
 }
+
+object PyColumn {
+  def fromRDD[T: ClassTag](rdd: RDD[T]) = {
+    val tpe = classTag[T]
+    if (tpe == classTag[Double]) PyColumn(Column(rdd.sparkContext, rdd.asInstanceOf[RDD[Double]], -1))
+    else if (tpe == classTag[String]) PyColumn(Column(rdd.sparkContext, rdd.asInstanceOf[RDD[String]], -1))
+    else null
+  }
+}
+
 
 case class PyPredicate(p: Predicate) {
   def And(that: PyPredicate) = {

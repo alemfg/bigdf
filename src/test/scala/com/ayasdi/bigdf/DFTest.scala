@@ -201,6 +201,19 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df("Feature1").parseErrors.value === 1)
   }
 
+  test("Delete a column") {
+    val df = makeDF
+    val countBefore = df.columnCount
+    val colsBefore = df.columnNames
+    df.delete("b")
+    val countAfter = df.columnCount
+    val colsAfter = df.columnNames
+
+    assert(countAfter === countBefore - 1)
+    assert(colsBefore.sameElements(List("a", "b", "c", "Date")))
+    assert(colsAfter.sameElements(List("a", "c", "Date")))
+  }
+
   test("Parse doubles") {
     val df = DF(sc, "src/test/resources/doubles.csv", ',', 0, Options())
     assert(df("F1").isDouble)

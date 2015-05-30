@@ -5,6 +5,7 @@
  */
 package com.ayasdi.bigdf
 
+import scala.collection.mutable
 import scala.collection.mutable.HashMap
 import scala.language.dynamics
 import scala.reflect.runtime.{universe => ru}
@@ -707,6 +708,24 @@ case class DF private(val sc: SparkContext,
    * update a column "c" of DF "df" like df.c = .. equivalent df("c") = ...
    */
   def updateDynamic(colName: String)(that: Column[Any]) = update(colName, that)
+
+  def delete(colName: String): Unit = {
+    require(nameToColumn.contains(colName))
+
+    val col = nameToColumn.remove(colName).get
+    val name = indexToColumnName.remove(col.index).get
+    assert(name == colName)
+
+    reIndexCols()
+  }
+
+  def reIndexCols(): Unit = {
+    val cols = indexToColumnName.toSeq.sortBy(_._1)
+    indexToColumnName.clear()
+    (0 until columnCount).foreach { i =>
+      indexToColumnName(i) = cols(i)._2
+    }
+  }
 
   /**
    * group by a column, uses a lot of memory. try to use aggregate(By) instead if possible

@@ -1,7 +1,6 @@
 <scalastyle>
     <name>Scalastyle standard configuration</name>
     <check level="error" class="org.scalastyle.file.FileTabChecker" enabled="true"></check>
-    <check level="error" class="org.scalastyle.scalariform.SpacesAfterPlusChecker" enabled="true"></check>
     <check level="error" class="org.scalastyle.file.WhitespaceEndOfLineChecker" enabled="false"></check>
     <check level="error" class="org.scalastyle.scalariform.SpacesBeforePlusChecker" enabled="true"></check>
     <check level="error" class="org.scalastyle.file.FileLineLengthChecker" enabled="true">
