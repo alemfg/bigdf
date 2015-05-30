@@ -5,7 +5,6 @@
  */
 package com.ayasdi.bigdf
 
-import scala.collection.mutable
 import scala.collection.mutable.HashMap
 import scala.language.dynamics
 import scala.reflect.runtime.{universe => ru}
