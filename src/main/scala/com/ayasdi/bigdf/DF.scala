@@ -15,7 +15,6 @@ import org.apache.spark.rdd.{RDD, UnionRDD}
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import com.ayasdi.bigdf.ColType.EnumVal
 import com.ayasdi.bigdf.readers.{BulkCsvReader, LineCsvReader}
 
 /**
@@ -840,7 +839,7 @@ object DF {
                inFile: String,
                separator: Char,  //FIXME: move to options
                nParts: Int = 0,
-               schema: Map[String, EnumVal] = Map(),
+               schema: Map[String, ColType.EnumVal] = Map(),
                options: Options = Options()): DF = {
     val df: DF = DF(sc, s"fromFile: $inFile", options)
     val file = if (nParts == 0) sc.textFile(inFile) else sc.textFile(inFile, nParts)
