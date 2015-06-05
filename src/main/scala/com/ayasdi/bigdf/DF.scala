@@ -130,7 +130,7 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * save the DF to a parquet file, skip compund columns like map and array
+   * save the DF to a parquet file, skip compound columns like map and array
    * @param file save DF in this file
    */
   def writeToParquet(file: String,
@@ -803,14 +803,14 @@ object DF {
    * @param nParts number of parts to process in parallel
    */
   def apply(sc: SparkContext, inFile: String, separator: Char, nParts: Int, options: Options): DF = {
-    if (FileUtils.isDir(inFile)(sc)) fromDir(sc, inFile, separator, nParts, options)
-    else fromFile(sc, inFile, separator, nParts, options = options)
+    if (FileUtils.isDir(inFile)(sc)) fromCSVDir(sc, inFile, separator, nParts, options)
+    else fromCSVFile(sc, inFile, separator, nParts, options = options)
   }
 
   def fromColumns(sc: SparkContext,
                   cols: Seq[Column[Any]],
                   dfName: String = "fromColumns", options: Options = Options()): DF = {
-    require(!cols.isEmpty)
+    require(!cols.isEmpty && cols.map(_.name).toSet.size == cols.map(_.name).toList.length)
     cols.foreach { col => require(col.rdd.partitions.length == cols.head.rdd.partitions.length) }
     val df = DF(sc, s"$dfName", options)
     cols.foreach { col =>
@@ -819,23 +819,32 @@ object DF {
     df
   }
 
-  def fromDir(sc: SparkContext, inDir: String, separator: Char, nParts: Int, options: Options): DF = {
+  /**
+   * create DF from a directory of comma(or other delimiter) separated text files
+   * first line of each file is a header
+   * Only numeric(for now only Double) and String data types are supported
+   * @param sc The spark context
+   * @param inDir Full path to the input directory. If running on cluster, it should be accessible on all nodes
+   * @param separator The field separator e.g. ',' for CSV file
+   * @param nParts number of parts to process in parallel
+   */
+  def fromCSVDir(sc: SparkContext, inDir: String, separator: Char, nParts: Int, options: Options): DF = {
     val files = FileUtils.dirToFiles(inDir)(sc)
     val numPartitions = if (nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
-    val dfs = files.map { file => fromFile(sc, file, separator, numPartitions) }
+    val dfs = files.map { file => fromCSVFile(sc, file, separator, numPartitions) }
     union(sc, dfs)
   }
 
   /**
-   * create DF from a text file with given separator
+   * create DF from a directory of comma(or other delimiter) separated text files
    * first line of file is a header
-   * For CSV/TSV files only numeric(for now only Double) and String data types are supported
+   * Only numeric(for now only Double) and String data types are supported
    * @param sc The spark context
-   * @param inFile Full path to the input CSV/TSV file. If running on cluster, it should be accessible on all nodes
+   * @param inFile Full path to the input file. If running on cluster, it should be accessible on all nodes
    * @param separator The field separator e.g. ',' for CSV file
    * @param nParts number of parts to process in parallel
    */
-  def fromFile(sc: SparkContext,
+  def fromCSVFile(sc: SparkContext,
                inFile: String,
                separator: Char,  //FIXME: move to options
                nParts: Int = 0,
@@ -913,34 +922,65 @@ object DF {
   }
 
   /**
+   * create DF from a parquet file. Schema should be flat and contain numeric and string types only(for now)
+   * @param sc The spark context
+   * @param inFile Full path to the input file. If running on cluster, it should be accessible on all nodes
+   */
+  def fromParquet(sc: SparkContext,
+                  inFile: String,
+                  options: Options = Options()): DF = {
+    val sparkDF = new SQLContext(sc).parquetFile(inFile)
+    require(sparkDF.schema.fields.forall { field =>
+        field.dataType == DoubleType ||
+        field.dataType == FloatType ||
+        field.dataType == StringType ||
+        field.dataType == IntegerType ||
+        field.dataType == ShortType
+    })
+
+    val cols = sparkDF.schema.fields.map { field =>
+      val i = sparkDF.schema.fields.indexOf(field)
+      SparkUtil.sqlToColType(field.dataType) match {
+        case ColType.Double =>
+          val rdd = sparkDF.rdd.map { row => row(i).asInstanceOf[Double] }
+          rdd.setName(s"$inFile/parquet-double/${field.name}")
+          Column(sc, rdd, -1, field.name)
+        case ColType.String =>
+          val rdd = sparkDF.rdd.map { row => row(i).asInstanceOf[String] }
+          rdd.setName(s"$inFile/parquet-string/${field.name}")
+          Column(sc, rdd, -1, field.name)
+        case _ => throw new Exception("Unsupported type")
+      }
+    }
+
+    DF.fromColumns(sc, cols, "fromParquetFile: $inFile", options)
+  }
+
+
+  /**
    * create a DF given column names and vectors of columns(not rows)
    */
-  def apply(sc: SparkContext, header: Vector[String], vec: Vector[Vector[Any]]): DF = {
+  def apply(sc: SparkContext,
+            header: Vector[String],
+            vec: Vector[Vector[Any]],
+            dfName: String,
+            options: Options): DF = {
     require(header.length == vec.length, "Shape mismatch")
-    require(vec.map {
-      _.length
-    }.toSet.size == 1, "Not a Vector of Vectors")
+    require(vec.map(_.length).toSet.size == 1, "Not a Vector of Vectors")
 
-    val df = DF(sc, "from_vector", Options())
-    df.addHeader(header.toArray)
-
-    var i = 0
-    vec.foreach { col =>
-      val colName: String = df.indexToColumnName(i)
+    val cols = header.zip(vec).map { case(colName, col) =>
       col(0) match {
         case c: Double =>
           println(s"Column: ${colName} Type: Double")
-          df.nameToColumn.put(colName,
-            Column(sc, sc.parallelize(col.asInstanceOf[Vector[Double]]), i))
+          Column(sc, sc.parallelize(col.asInstanceOf[Vector[Double]]), -1, colName)
 
         case c: String =>
           println(s"Column: ${colName} Type: String")
-          df.nameToColumn.put(colName,
-            Column(sc, sc.parallelize(col.asInstanceOf[Vector[String]]), i))
+          Column(sc, sc.parallelize(col.asInstanceOf[Vector[String]]), -1, colName)
       }
-      i += 1
     }
-    df
+
+    DF.fromColumns(sc, cols, dfName, options)
   }
 
   /**

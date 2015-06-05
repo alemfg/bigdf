@@ -7,10 +7,11 @@ package com.ayasdi.bigdf
 
 import java.io.File
 
-import org.apache.log4j.{Logger, Level}
+import org.apache.log4j.{Level, Logger}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.types._
 
 private[bigdf] object CountHelper {
   def countNaN(row: Array[Any]) = {
@@ -56,7 +57,7 @@ object FileUtils {
 
 
     val file = new File(path)
-    if(file.exists()) {
+    if (file.exists()) {
       getRecursively(file).foreach { f =>
         if (!f.delete())
           throw new RuntimeException("Failed to delete " + f.getAbsolutePath)
@@ -65,14 +66,15 @@ object FileUtils {
   }
 
   def dirToFiles(path: String, recursive: Boolean = true)(implicit sc: SparkContext) = {
-    import org.apache.hadoop.fs._
     import scala.collection.mutable.MutableList
+
+    import org.apache.hadoop.fs._
     val fs = FileSystem.get(sc.hadoopConfiguration)
     val files = fs.listFiles(new Path(path), recursive)
     val fileList = MutableList[String]()
-    while(files.hasNext) {
+    while (files.hasNext) {
       val file = files.next
-      if(file.isFile) fileList += file.getPath.toUri.getPath
+      if (file.isFile) fileList += file.getPath.toUri.getPath
     }
 
     fileList.toList
@@ -101,4 +103,28 @@ object SparkUtil {
         loggerName -> prevLevel
     }.toMap
   }
+
+  def sqlToColType(sqlType: DataType): ColType.EnumVal = sqlType match {
+    case DoubleType => ColType.Double
+    case FloatType => ColType.Double
+    case ShortType => ColType.Double //FIXME: categoricals
+    // FIXME: support following
+    //    case StringType => ColType.String
+    //    case ArrayType(DoubleType, _) => ColType.ArrayOfDouble
+    //    case ArrayType(StringType, _) => ColType.ArrayOfString
+    //    case MapType(StringType, FloatType, _) => ColType.MapOfStringToFloat
+    case _ => throw new Exception("Unsupported type")
+  }
+
+  def colTypeToSql(colType: ColType.EnumVal): DataType = colType match {
+    case ColType.Double => DoubleType
+    case ColType.Float => FloatType
+    case ColType.Short => ShortType
+    case ColType.String => StringType
+    case ColType.ArrayOfDouble => ArrayType(DoubleType)
+    case ColType.ArrayOfString => ArrayType(StringType)
+    case ColType.MapOfStringToFloat => MapType(StringType, FloatType)
+    case _ => throw new Exception("Unsupported type")
+  }
+
 }
