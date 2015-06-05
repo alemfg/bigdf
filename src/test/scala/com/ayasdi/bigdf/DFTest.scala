@@ -355,7 +355,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     df.newCol = df.a + df.b
     assert(df.newCol.doubleRdd.first === aa + bb)
-    df.newCol = df.a
+    df.newCol = df.a.makeCopy
     assert(df.newCol.doubleRdd.first === aa)
   }
 
@@ -390,6 +390,24 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     val df = makeDF
     df("new") = df("a", "b").map2(TestFunctions2.summer)
     assert(df("new").doubleRdd.first === 21 + 11)
+  }
+
+  test("DF from columns") {
+    val df = makeDF
+    val colA = df("a").makeCopy
+    colA.name = "a"
+    val df2 = DF.fromColumns(df.sc, List(colA))
+    assert(df2("a").doubleRdd.collect() === df("a").doubleRdd.collect())
+
+    val rdd = sc.parallelize(1 to 10).map(_.toDouble)
+    val col = Column(sc, rdd)
+    df2("new") = col
+    assert(df2("new").doubleRdd.collect() === rdd.collect())
+
+    val col2 = Column(sc, rdd)
+    col2.name = "new2"
+    val df3 = DF.fromColumns(sc, List(col2))
+    assert(df3("new2").doubleRdd.collect() === rdd.collect())
   }
 
   test("Aggregate") {

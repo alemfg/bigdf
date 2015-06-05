@@ -6,14 +6,14 @@
  */
 package com.ayasdi.bigdf
 
+import scala.collection.mutable.HashMap
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.{ClassTag, classTag}
+
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-
-import scala.collection.mutable.HashMap
-import scala.reflect.runtime.{universe => ru}
-import scala.reflect.{ClassTag, classTag}
 
 /**
  * For modularity column operations are grouped in several classes
@@ -63,7 +63,8 @@ object ColType {
 class Column[+T: ru.TypeTag] private(val sc: SparkContext,
                                      var rdd: RDD[Any] = null,
                                      var index: Int = -1,
-                                     name: String = "anon") {
+                                     var name: String = "anon",
+                                     var df: Option[DF]) {
   /**
    * set names for categories
    * FIXME: this should be somewhere else not in Column[T]
@@ -190,6 +191,16 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   }
 
   /**
+   * make a clone of this column, the clone does not belong to any DF yet
+   */
+  def makeCopy = Column[T](sc, rdd.asInstanceOf[RDD[T]])
+
+//  def name_=(n: String): Unit = {
+//    require(df.isEmpty)
+//    name = n
+//  }
+
+  /**
    * print upto max(default 10) elements
    */
   def list(max: Int = 10): Unit = head(max).foreach(println)
@@ -272,7 +283,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    */
   def asCategorical = {
     require(isDouble)
-    Column.asShorts(sc, doubleRdd, -1, doubleRdd.getStorageLevel)
+    Column.asShorts(sc, doubleRdd, -1, doubleRdd.getStorageLevel, name, None)
   }
 
   /**
@@ -493,8 +504,8 @@ object Column {
    * Items with parse failures become NaNs
    */
   def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int,
-                cacheLevel: StorageLevel, opts: NumberParsingOpts) = {
-    val col = new Column[Double](sCtx, null, index)
+                cacheLevel: StorageLevel, opts: NumberParsingOpts, name: String, df: DF) = {
+    val col = new Column[Double](sCtx, null, index, name, Some(df))
     val parseErrors = col.parseErrors
 
     val doubleRdd = stringRdd.map { x => SchemaUtils.parseDouble(parseErrors, x, opts) }
@@ -509,7 +520,7 @@ object Column {
    * Items with parse failures become NaNs
    */
   def asFloats(sCtx: SparkContext, stringRdd: RDD[String], index: Int, cacheLevel: StorageLevel) = {
-    val col = new Column[Float](sCtx, null, index)
+    val col = new Column[Float](sCtx, null, index, "asFloats", None)
     val parseErrors = col.parseErrors
 
     val floatRdd = stringRdd.map { x =>
@@ -532,8 +543,12 @@ object Column {
    * Errors are counted in parseErrors field.
    * Column of categories aka Categorical column has operations for categories like One Hot Encode etc
    */
-  def asShorts(sCtx: SparkContext, doubleRdd: RDD[Double], index: Int, cacheLevel: StorageLevel) = {
-    val col = new Column[Short](sCtx, null, index)
+  def asShorts(sCtx: SparkContext,
+               doubleRdd: RDD[Double],
+               index: Int,
+               cacheLevel: StorageLevel,
+               name: String, df: Option[DF]) = {
+    val col = new Column[Short](sCtx, null, index, name, df)
     val parseErrors = col.parseErrors
 
     val shortRdd = doubleRdd.map { x =>
@@ -542,7 +557,7 @@ object Column {
       y
     }
 
-    shortRdd.setName(s"${doubleRdd.name}.toShort").persist(cacheLevel)
+    shortRdd.setName(name).persist(cacheLevel)
     col.rdd = shortRdd.asInstanceOf[RDD[Any]]
 
     col
@@ -551,7 +566,7 @@ object Column {
   /**
    * create Column from existing RDD
    */
-  def apply[T: ru.TypeTag](sCtx: SparkContext, rdd: RDD[T], index: Int = -1) = {
-    new Column[T](sCtx, rdd.asInstanceOf[RDD[Any]], index)
+  def apply[T: ru.TypeTag](sCtx: SparkContext, rdd: RDD[T], index: Int = -1, name: String = s"fromRdd") = {
+    new Column[T](sCtx, rdd.asInstanceOf[RDD[Any]], index, name, None)
   }
 }
