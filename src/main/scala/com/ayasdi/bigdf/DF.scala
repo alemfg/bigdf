@@ -15,7 +15,6 @@ import org.apache.spark.rdd.{RDD, UnionRDD}
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import com.ayasdi.bigdf.ColType.EnumVal
 import com.ayasdi.bigdf.readers.{BulkCsvReader, LineCsvReader}
 
 /**
@@ -489,43 +488,43 @@ case class DF private(val sc: SparkContext,
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Double]
           }.cache()
-          newDf(aggdByCol) =  Column(sc, col1, newDf.columnCount)
+          newDf(aggdByCol) = Column(sc, col1)
         }
         case ColType.Float => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Float]
           }.cache()
-          newDf(aggdByCol) =  Column(sc, col1, newDf.columnCount)
+          newDf(aggdByCol) = Column(sc, col1)
         }
         case ColType.Short => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Short]
           }.cache()
-          newDf(aggdByCol) =  Column(sc, col1, newDf.columnCount)
+          newDf(aggdByCol) = Column(sc, col1)
         }
         case ColType.String => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[String]
           }.cache()
-          newDf(aggdByCol) =  Column(sc, col1, newDf.columnCount)
+          newDf(aggdByCol) = Column(sc, col1)
         }
         case ColType.ArrayOfString => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Array[String]]
           }.cache()
-          newDf(aggdByCol) =  Column(sc, col1, newDf.columnCount)
+          newDf(aggdByCol) = Column(sc, col1)
         }
         case ColType.ArrayOfDouble => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Array[Double]]
           }.cache()
-          newDf(aggdByCol) =  Column(sc, col1, newDf.columnCount)
+          newDf(aggdByCol) = Column(sc, col1)
         }
         case ColType.MapOfStringToFloat => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Map[String, Float]]
           }.cache()
-          newDf(aggdByCol) =  Column(sc, col1, newDf.columnCount)
+          newDf(aggdByCol) = Column(sc, col1)
         }
         case ColType.Undefined => {
           throw new RuntimeException(s"ERROR: Undefined column type while aggregating ${aggdByCol}")
@@ -540,17 +539,17 @@ case class DF private(val sc: SparkContext,
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }.asInstanceOf[RDD[Double]]
-      newDf(aggdCol) =  Column(sc, col1, 1)
+      newDf(aggdCol) = Column(sc, col1)
     } else if (wtpe == classTag[String]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }.asInstanceOf[RDD[String]]
-      newDf(aggdCol) =  Column(sc, col1, newDf.columnCount)
+      newDf(aggdCol) = Column(sc, col1)
     } else if(wtpe == classTag[Array[String]]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }.asInstanceOf[RDD[Array[String]]]
-      newDf(aggdCol) =  Column(sc, col1, newDf.columnCount)
+      newDf(aggdCol) = Column(sc, col1)
     } else {
       throw new RuntimeException(s"ERROR: aggregate value type $wtpe")
     }
@@ -687,18 +686,21 @@ case class DF private(val sc: SparkContext,
    * update a column, add or replace
    */
   def update(colName: String, that: Column[Any]) = {
-    val col = nameToColumn.getOrElse(colName, null)
+    require(that.df.isEmpty && that.index == -1)
 
-    nameToColumn.put(colName, that)
-    if (null != col) {
+    val col = nameToColumn.get(colName)
+    nameToColumn(colName) = that
+    if (!col.isEmpty) {
       println(s"Replaced Column: ${colName}")
-      that.index = col.index
+      that.index = col.get.index
     } else {
       println(s"New Column: ${colName}")
       val colIndex = indexToColumnName.size
       indexToColumnName.put(colIndex, colName)
       that.index = colIndex
     }
+    that.name = colName
+    that.df = Some(this)
     rowsRddCached = None //invalidate cached rows
     //FIXME: incremental computation of rows
   }
@@ -805,6 +807,18 @@ object DF {
     else fromFile(sc, inFile, separator, nParts, options = options)
   }
 
+  def fromColumns(sc: SparkContext,
+                  cols: Seq[Column[Any]],
+                  dfName: String = "fromColumns", options: Options = Options()): DF = {
+    require(!cols.isEmpty)
+    cols.foreach { col => require(col.rdd.partitions.length == cols.head.rdd.partitions.length) }
+    val df = DF(sc, s"$dfName", options)
+    cols.foreach { col =>
+      df(col.name) = col
+    }
+    df
+  }
+
   def fromDir(sc: SparkContext, inDir: String, separator: Char, nParts: Int, options: Options): DF = {
     val files = FileUtils.dirToFiles(inDir)(sc)
     val numPartitions = if (nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
@@ -825,7 +839,7 @@ object DF {
                inFile: String,
                separator: Char,  //FIXME: move to options
                nParts: Int = 0,
-               schema: Map[String, EnumVal] = Map(),
+               schema: Map[String, ColType.EnumVal] = Map(),
                options: Options = Options()): DF = {
     val df: DF = DF(sc, s"fromFile: $inFile", options)
     val file = if (nParts == 0) sc.textFile(inFile) else sc.textFile(inFile, nParts)
@@ -886,7 +900,7 @@ object DF {
       println(s"Column: ${colName} \t\t\tGuessed Type: ${t}")
       if (t == ColType.Double) {
         df.nameToColumn.put(df.indexToColumnName(i),
-          Column.asDoubles(sc, col, i, df.storageLevel, options.numberParsingOpts))
+          Column.asDoubles(sc, col, i, df.storageLevel, options.numberParsingOpts, colName, df))
         col.unpersist()
       } else {
         df.nameToColumn.put(colName, Column(sc, col, i))
