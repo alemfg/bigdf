@@ -850,7 +850,7 @@ object DF {
                nParts: Int = 0,
                schema: Map[String, ColType.EnumVal] = Map(),
                options: Options = Options()): DF = {
-    val df: DF = DF(sc, s"fromFile: $inFile", options)
+
     val file = if (nParts == 0) sc.textFile(inFile) else sc.textFile(inFile, nParts)
 
     // parse header line
@@ -862,7 +862,6 @@ object DF {
       escape = options.csvParsingOpts.escapeChar
     ).parseLine(firstLine)
     println(s"Found ${header.size} columns in header")
-    df.addHeader(header)
 
     // parse data lines
     val dataLines = file.mapPartitionsWithIndex({
@@ -882,43 +881,41 @@ object DF {
           badLinePolicy = options.lineParsingOpts.badLinePolicy,
           fillValue = options.lineParsingOpts.fillValue)
       }
-    }, true).persist(df.storageLevel)
+    }, true).persist(options.perfTuningOpts.storageLevel)
 
     // FIXME: see if this is a lot faster with an rdd.unzip function
-    val columns = for (i <- 0 until df.columnCount) yield {
-      rows.map { row => row(i) }
-        .persist(df.storageLevel)
+    val colRdds = for (i <- 0 until header.length) yield {
+      rows.map { row => row(i) }.persist(options.perfTuningOpts.storageLevel)
     }
 
-    var i = 0
-    columns.foreach { col =>
-      val t = if (schema.contains(header(i))) {
-        schema.get(header(i)).get
+    val columns = header.zip(colRdds).map { case (colName, colRdd) =>
+      val i = header.indexOf(colName)
+      val t = if (schema.contains(colName)) {
+        schema.get(colName).get
       } else if (options.numberParsingOpts.enable) {
         if (options.schemaGuessingOpts.fastSamplingEnable) {
           val firstFewRows = rows.take(options.schemaGuessingOpts.fastSamplingSize)
           SchemaUtils.guessTypeByFirstFew(firstFewRows.map { row => row(i) }, options.numberParsingOpts)
         } else {
-          SchemaUtils.guessType(sc, columns(i))
+          SchemaUtils.guessType(sc, colRdds(i))
         }
       } else {
         ColType.String
       }
-      val colName = df.indexToColumnName(i)
-      col.setName(s"$t/$inFile/${colName}")
+
+      colRdd.setName(s"$t/$inFile/${colName}")
       println(s"Column: ${colName} \t\t\tGuessed Type: ${t}")
-      if (t == ColType.Double) {
-        df.nameToColumn.put(df.indexToColumnName(i),
-          Column.asDoubles(sc, col, i, df.storageLevel, options.numberParsingOpts, colName, df))
-        col.unpersist()
+
+      val col = if (t == ColType.Double) {
+        Column.asDoubles(sc, colRdd, -1, options.perfTuningOpts.storageLevel, options.numberParsingOpts, colName, None)
       } else {
-        df.nameToColumn.put(colName, Column(sc, col, i))
-        col.persist(df.storageLevel)
+        Column(sc, colRdd, -1, colName)
       }
-      i += 1
+
+      col
     }
-    //rows.unpersist()
-    df
+
+    DF.fromColumns(sc, columns, s"fromCSVFile: ${inFile}", options)
   }
 
   /**

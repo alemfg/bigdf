@@ -504,8 +504,8 @@ object Column {
    * Items with parse failures become NaNs
    */
   def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int,
-                cacheLevel: StorageLevel, opts: NumberParsingOpts, name: String, df: DF) = {
-    val col = new Column[Double](sCtx, null, index, name, Some(df))
+                cacheLevel: StorageLevel, opts: NumberParsingOpts, name: String, df: Option[DF]) = {
+    val col = new Column[Double](sCtx, null, index, name, df)
     val parseErrors = col.parseErrors
 
     val doubleRdd = stringRdd.map { x => SchemaUtils.parseDouble(parseErrors, x, opts) }
