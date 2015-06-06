@@ -32,7 +32,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       Vector(21.0, 22.0, 23.0),
       Vector(31.0, 32.0, 33.0),
       Vector(1.36074391383E12, 1.360616948975E12, 1.36055080601E12))
-    DF(sc, h, v)
+    DF(sc, h, v, "makeDF", Options())
   }
 
   private[bigdf] def makeDFWithNAs = {
@@ -41,7 +41,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       Vector("b1", "", "b3"),
       Vector(31.0, 32.0, 33.0),
       Vector(1.36074391383E12, 1.360616948975E12, 1.36055080601E12))
-    DF(sc, h, v)
+    DF(sc, h, v, "makeDFWithNAs", Options())
   }
 
   private[bigdf] def makeDFWithNulls = {
@@ -50,7 +50,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       Vector("b1", "NULL", "b3"),
       Vector(31.0, 32.0, 33.0),
       Vector(1.36074391383E12, 1.360616948975E12, 1.36055080601E12))
-    DF(sc, h, v)
+    DF(sc, h, v, "makeDFWithNAs", Options())
   }
 
   private[bigdf] def makeDFWithString = {
@@ -59,7 +59,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       Vector(21.0, 22.0, 23.0),
       Vector(31.0, 32.0, 33.0),
       Vector(1.36074391383E12, 1.360616948975E12, 1.36055080601E12))
-    DF(sc, h, v)
+    DF(sc, h, v, "makeDFWithNAs", Options())
   }
 
   private[bigdf] def makeDFFromCSVFile(file: String, options: Options = Options()) = {
@@ -92,7 +92,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Construct: DF from CSV file with missing fields, ignore policy") {
-    val df = DF.fromFile(sc, "src/test/resources/missingFields.csv", ',', 0,
+    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
       options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Fill)))
     df.list()
     assert(df.columnCount === 3)
@@ -100,7 +100,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Construct: DF from CSV file with missing fields, fill policy") {
-    val df = DF.fromFile(sc, "src/test/resources/missingFields.csv", ',', 0, options = Options())
+    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0, options = Options())
     df.list()
     assert(df.columnCount === 3)
     assert(df.rowCount === 2)
@@ -108,7 +108,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
   test("Construct: DF from CSV file with missing fields, abort policy") {
     val exception = intercept[SparkException] {
-      val df = DF.fromFile(sc, "src/test/resources/missingFields.csv", ',', 0,
+      val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
         options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Abort)))
       df.list()
     }
@@ -226,7 +226,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Schema Dictate") {
-    val df = DF.fromFile(sc, "src/test/resources/doubles.csv", ',', 0, Map("F1" -> ColType.String))
+    val df = DF.fromCSVFile(sc, "src/test/resources/doubles.csv", ',', 0, Map("F1" -> ColType.String))
     assert(df("F1").isString)
     df.list()
   }
@@ -469,6 +469,25 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     FileUtils.removeAll(fileName)
     df.writeToParquet(fileName)
     assert(true === Files.exists(Paths.get(fileName)))
+  }
+
+  test("fromParquet") {
+    val fileName = "/tmp/x"
+    val df = makeDF
+    FileUtils.removeAll(fileName)
+    df.writeToParquet(fileName)
+    assert(true === Files.exists(Paths.get(fileName)))
+
+    val df2 = DF.fromParquet(sc, fileName)
+
+    println(df.columnNames.mkString)
+    println(df2.columnNames.mkString)
+
+    assert(df2.columnNames === df.columnNames)
+    df.columns().foreach { col =>
+      println(s"**${col.name}")
+      assert(df2(col.name).rdd.collect().toSet === col.rdd.collect().toSet)
+    }
   }
 
 }
