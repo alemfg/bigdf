@@ -981,38 +981,6 @@ object DF {
   }
 
   /**
-   * create a DF from a ColumnSeq
-   */
-  def apply(sc: SparkContext, colSeq: ColumnSeq): DF = {
-    val df = DF(sc, "colseq", Options())
-    val header = colSeq.cols.map {
-      _._1
-    }
-    val columns = colSeq.cols.map {
-      _._2
-    }
-
-    df.addHeader(header.toArray)
-    var i = 0
-    columns.foreach { col =>
-      println(s"Column: ${df.indexToColumnName(i)} Type: Double")
-      df.nameToColumn.put(df.indexToColumnName(i), col)
-      i += 1
-    }
-    df
-  }
-
-  /**
-   * create a DF from a Column
-   */
-  def apply(sc: SparkContext, name: String, col: Column[Double]): DF = {
-    val df = DF(sc, "col", Options())
-    val i = df.addHeader(Array(name))
-    df.nameToColumn.put(df.indexToColumnName(i - 1), col)
-    df
-  }
-
-  /**
    * relational-like join two DFs
    */
   def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType = JoinType.Inner) = {
