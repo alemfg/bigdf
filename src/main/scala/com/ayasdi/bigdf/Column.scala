@@ -32,6 +32,8 @@ object Implicits {
   implicit def columnAnyToRichColumnCategory(col: Column[Any]) = new RichColumnCategory(col.castShort)
 
   implicit def columnAnyToRichColumnMap(col: Column[Any]) = new RichColumnMaps(col.castMapStringToFloat)
+
+  implicit def columnSeqToRichColumnSeq(cols: Seq[Column[Any]]) = new RichColumnSeq(cols)
 }
 
 /*
@@ -59,7 +61,16 @@ object ColType {
   case object Undefined extends EnumVal
 }
 
-
+/**
+ * One column in a DF. It is a collection of elements of the same type. Can be contained in at most one DF. Once
+ * assigned to a DF cannot be "moved" to another DF. To do that make a copy using Column.makeCopy
+ * @param sc spark context
+ * @param rdd the RDD that holds the collection of elements
+ * @param index the index at which this Column exists in containing DF. -1 if not in a DF yet.
+ * @param name the name of this Column in containing DF
+ * @param df the containing DF
+ * @tparam T type of the column's elements
+ */
 class Column[+T: ru.TypeTag] private(val sc: SparkContext,
                                      var rdd: RDD[Any] = null,
                                      var index: Int = -1,
@@ -191,7 +202,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   }
 
   /**
-   * make a clone of this column, the clone does not belong to any DF yet
+   * make a clone of this column, the clone does not belong to any DF  and has no name
    */
   def makeCopy = Column[T](sc, rdd.asInstanceOf[RDD[T]])
 

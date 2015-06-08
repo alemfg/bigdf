@@ -149,28 +149,28 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   test("Column Index: Refer to multiple columns of a DF") {
     val df = makeDF
     val colSeq = df("a", "b")
-    val acol = colSeq.cols(0)
-    val bcol = colSeq.cols(1)
-    assert(acol._1 === "a")
-    assert((acol._2 eq df("a")) === true)
-    assert(bcol._1 === "b")
-    assert((bcol._2 eq df("b")) === true)
+    val acol = colSeq(0)
+    val bcol = colSeq(1)
+    assert(acol.name === "a")
+    assert((acol eq df("a")) === true)
+    assert(bcol.name === "b")
+    assert((bcol eq df("b")) === true)
   }
 
   test("Column Index: Refer to non-existent columns of a DF") {
     val df = makeDF
     val colSeq = df("a", "bb")
-    assert(colSeq == null)
+    assert(colSeq(1) == null)
   }
 
   test("Column Index: Slices") {
     val df = makeDF
 
     val colSeq2 = df(0 to 0, 1 to 3)
-    assert(colSeq2.cols.length === 4)
-    assert((colSeq2.cols(0)._2 eq df("a")) === true)
-    assert((colSeq2.cols(1)._2 eq df("b")) === true)
-    assert((colSeq2.cols(2)._2 eq df("c")) === true)
+    assert(colSeq2.length === 4)
+    assert((colSeq2(0) eq df("a")) === true)
+    assert((colSeq2(1) eq df("b")) === true)
+    assert((colSeq2(2) eq df("c")) === true)
   }
 
   test("Column Index: Rename") {
@@ -382,13 +382,13 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
   test("Column Ops: New column as custom function of existing ones") {
     val df = makeDF
-    df("new") = df("a", "b").map(TestFunctions.summer)
+    df("new") = df("a", "b").slowMap(TestFunctions.summer)
     assert(df("new").doubleRdd.first === 21 + 11)
   }
 
   test("Column Ops: New column as custom function of existing ones - faster?") {
     val df = makeDF
-    df("new") = df("a", "b").map2(TestFunctions2.summer)
+    df("new") = RichColumnSeq(df("a", "b")).map(TestFunctions2.summer)
     assert(df("new").doubleRdd.first === 21 + 11)
   }
 

@@ -29,7 +29,7 @@ object JoinType extends Enumeration {
  * Data Frame is a map of column name to an RDD containing that column.
  * Constructor is private, instances are created by factory calls(apply) in
  * companion object.
- * Number of rows cannot change. Columns can be added, removed, mutated.
+ * Number of rows cannot change. Columns can be added, removed, modified.
  * The following types of columns are supported:
  * Double
  * Float
@@ -167,7 +167,7 @@ case class DF private(val sc: SparkContext,
    * or   myDF(0 to 0, 4 to 10, 6 to 1000)
    * @param items Sequence of names, indices or ranges. No mix n match yet
    */
-  def apply[T: ru.TypeTag](items: T*): ColumnSeq = {
+  def apply[T: ru.TypeTag](items: T*): Seq[Column[Any]] = {
     val tpe = ru.typeOf[T]
 
     require(tpe =:= ru.typeOf[Int] || tpe =:= ru.typeOf[String] ||
@@ -196,32 +196,19 @@ case class DF private(val sc: SparkContext,
    * get multiple columns identified by names
    * @param colNames names of columns
    */
-  def columnsByNames(colNames: Seq[String]) = {
-    val selectedCols = for (colName <- colNames)
-      yield (colName, nameToColumn.getOrElse(colName, null))
-    if (selectedCols.exists(null == _._2)) {
-      val notFound = selectedCols.filter(null == _._2)
-      println("You sure? I don't know about these columns" + notFound.mkString(","))
-      null
-    } else {
-      new ColumnSeq(selectedCols)
-    }
-  }
+  def columnsByNames(colNames: Seq[String]) = colNames.map(column(_))
 
   /**
    * get columns by ranges of numeric indices. invalid indices are silently ignored.
    * FIXME: solo has to be "5 to 5" for now, should be just "5"
    * @param indexRanges sequence of ranges like List(1 to 5, 13 to 15)
    */
-  def columnsByRanges(indexRanges: Seq[Range]) = {
-    val selectedCols = for (
+  def columnsByRanges(indexRanges: Seq[Range]) = for (
       indexRange <- indexRanges;
-      index <- indexRange;
+      index <- indexRange
       if (indexToColumnName(index) != null)
-    ) yield (indexToColumnName(index), nameToColumn(indexToColumnName(index)))
+    ) yield nameToColumn(indexToColumnName(index))
 
-    new ColumnSeq(selectedCols)
-  }
 
   /**
    * get columns by sequence of numeric indices
@@ -907,7 +894,8 @@ object DF {
       println(s"Column: ${colName} \t\t\tGuessed Type: ${t}")
 
       val col = if (t == ColType.Double) {
-        Column.asDoubles(sc, colRdd, -1, options.perfTuningOpts.storageLevel, options.numberParsingOpts, colName, None)
+        Column.asDoubles(
+          sc, colRdd, -1, options.perfTuningOpts.storageLevel, options.numberParsingOpts, colName, None)
       } else {
         Column(sc, colRdd, -1, colName)
       }
