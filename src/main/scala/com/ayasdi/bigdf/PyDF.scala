@@ -37,7 +37,7 @@ case class PyDF(df: DF) {
   def colCount = df.colCount
 
   def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType) = {
-    df.join(sc, left, right, on, how)
+    DF.join(sc, left, right, on, how)
   }
 
   def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String): PyDF = {
