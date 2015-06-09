@@ -29,7 +29,7 @@ object JoinType extends Enumeration {
  * Data Frame is a map of column name to an RDD containing that column.
  * Constructor is private, instances are created by factory calls(apply) in
  * companion object.
- * Number of rows cannot change. Columns can be added, removed, mutated.
+ * Number of rows cannot change. Columns can be added, removed, modified.
  * The following types of columns are supported:
  * Double
  * Float
@@ -101,10 +101,8 @@ case class DF private(val sc: SparkContext,
    * @param cols sequence of column names to include in output
    */
   def toCSV(separator: String = ",", cols: Seq[String]) = {
-    val writeColNames = cols.filter {
-      nameToColumn(_).csvWritable
-    }
-    val writeCols = writeColNames.map(nameToColumn(_))
+    val writeColNames = cols.filter(column(_).csvWritable)
+    val writeCols = writeColNames.map(column(_))
 
     val rows = ColumnZipper.zipAndMap(writeCols) { row => row.mkString(separator) }
     val header = writeColNames.mkString(separator)
@@ -167,7 +165,7 @@ case class DF private(val sc: SparkContext,
    * or   myDF(0 to 0, 4 to 10, 6 to 1000)
    * @param items Sequence of names, indices or ranges. No mix n match yet
    */
-  def apply[T: ru.TypeTag](items: T*): ColumnSeq = {
+  def apply[T: ru.TypeTag](items: T*): Seq[Column[Any]] = {
     val tpe = ru.typeOf[T]
 
     require(tpe =:= ru.typeOf[Int] || tpe =:= ru.typeOf[String] ||
@@ -196,32 +194,19 @@ case class DF private(val sc: SparkContext,
    * get multiple columns identified by names
    * @param colNames names of columns
    */
-  def columnsByNames(colNames: Seq[String]) = {
-    val selectedCols = for (colName <- colNames)
-      yield (colName, nameToColumn.getOrElse(colName, null))
-    if (selectedCols.exists(null == _._2)) {
-      val notFound = selectedCols.filter(null == _._2)
-      println("You sure? I don't know about these columns" + notFound.mkString(","))
-      null
-    } else {
-      new ColumnSeq(selectedCols)
-    }
-  }
+  def columnsByNames(colNames: Seq[String]) = colNames.map(column(_))
 
   /**
    * get columns by ranges of numeric indices. invalid indices are silently ignored.
    * FIXME: solo has to be "5 to 5" for now, should be just "5"
    * @param indexRanges sequence of ranges like List(1 to 5, 13 to 15)
    */
-  def columnsByRanges(indexRanges: Seq[Range]) = {
-    val selectedCols = for (
+  def columnsByRanges(indexRanges: Seq[Range]) = for (
       indexRange <- indexRanges;
-      index <- indexRange;
+      index <- indexRange
       if (indexToColumnName(index) != null)
-    ) yield (indexToColumnName(index), nameToColumn(indexToColumnName(index)))
+    ) yield nameToColumn(indexToColumnName(index))
 
-    new ColumnSeq(selectedCols)
-  }
 
   /**
    * get columns by sequence of numeric indices
@@ -470,9 +455,7 @@ case class DF private(val sc: SparkContext,
                                                                                  aggtor: Aggregator[U, V, W]) = {
 
     val wtpe = classTag[W]
-    if (aggtor != AggCount) require(nameToColumn(aggdCol).compareType(classTag[U]))
-
-    val newDf = DF(sc, s"${name}/${aggdCol}_aggby_${aggdByCols.mkString(";")}", options)
+    if (aggtor != AggCount) require(column(aggdCol).compareType(classTag[U]))
 
     val aggedRdd = keyBy(aggdByCols, aggdCol).asInstanceOf[RDD[(List[Any], U)]]
       .combineByKey(aggtor.convert, aggtor.mergeValue, aggtor.mergeCombiners)
@@ -481,50 +464,50 @@ case class DF private(val sc: SparkContext,
 
     // columns of key
     var i = 0
-    aggdByCols.foreach { aggdByCol =>
+    val aggdByColsInResult = aggdByCols.map { aggdByCol =>
       val j = i
-      nameToColumn(aggdByCol).colType match {
+      val col = column(aggdByCol).colType match {
         case ColType.Double => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Double]
           }.cache()
-          newDf(aggdByCol) = Column(sc, col1)
+          Column(sc, col1)
         }
         case ColType.Float => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Float]
           }.cache()
-          newDf(aggdByCol) = Column(sc, col1)
+          Column(sc, col1)
         }
         case ColType.Short => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Short]
           }.cache()
-          newDf(aggdByCol) = Column(sc, col1)
+          Column(sc, col1)
         }
         case ColType.String => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[String]
           }.cache()
-          newDf(aggdByCol) = Column(sc, col1)
+          Column(sc, col1)
         }
         case ColType.ArrayOfString => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Array[String]]
           }.cache()
-          newDf(aggdByCol) = Column(sc, col1)
+          Column(sc, col1)
         }
         case ColType.ArrayOfDouble => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Array[Double]]
           }.cache()
-          newDf(aggdByCol) = Column(sc, col1)
+          Column(sc, col1)
         }
         case ColType.MapOfStringToFloat => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Map[String, Float]]
           }.cache()
-          newDf(aggdByCol) = Column(sc, col1)
+          Column(sc, col1)
         }
         case ColType.Undefined => {
           throw new RuntimeException(s"ERROR: Undefined column type while aggregating ${aggdByCol}")
@@ -532,29 +515,35 @@ case class DF private(val sc: SparkContext,
       }
 
       i += 1
+      col.name = aggdByCol
+      col
     }
 
     // finalize the aggregations and add column of that
-    if (wtpe == classTag[Double]) {
+    val aggdColumnInResult = if (wtpe == classTag[Double]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }.asInstanceOf[RDD[Double]]
-      newDf(aggdCol) = Column(sc, col1)
+      Column(sc, col1)
     } else if (wtpe == classTag[String]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }.asInstanceOf[RDD[String]]
-      newDf(aggdCol) = Column(sc, col1)
+      Column(sc, col1)
     } else if(wtpe == classTag[Array[String]]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }.asInstanceOf[RDD[Array[String]]]
-      newDf(aggdCol) = Column(sc, col1)
+      Column(sc, col1)
     } else {
       throw new RuntimeException(s"ERROR: aggregate value type $wtpe")
     }
 
-    newDf
+    aggdColumnInResult.name = aggdCol
+
+    val newDFName = s"${name}/${aggdCol}_aggby_${aggdByCols.mkString(";")}"
+
+    DF.fromColumns(sc, aggdByColsInResult :+ aggdColumnInResult, newDFName, options)
   }
 
   private def keyBy(colNames: Seq[String], valueCol: String) = {
@@ -562,7 +551,7 @@ case class DF private(val sc: SparkContext,
       nameToColumn(_).index
     }
     ColumnZipper.makeList(this, columns)
-  }.zip(nameToColumn(valueCol).rdd)
+  }.zip(column(valueCol).rdd)
 
   /**
    * aggregate multiple columns after grouping by multiple other columns
@@ -907,7 +896,8 @@ object DF {
       println(s"Column: ${colName} \t\t\tGuessed Type: ${t}")
 
       val col = if (t == ColType.Double) {
-        Column.asDoubles(sc, colRdd, -1, options.perfTuningOpts.storageLevel, options.numberParsingOpts, colName, None)
+        Column.asDoubles(
+          sc, colRdd, -1, options.perfTuningOpts.storageLevel, options.numberParsingOpts, colName, None)
       } else {
         Column(sc, colRdd, -1, colName)
       }

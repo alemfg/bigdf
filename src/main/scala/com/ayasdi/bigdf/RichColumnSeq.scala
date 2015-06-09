@@ -13,13 +13,12 @@ import scala.reflect.{ClassTag, classTag}
  * Sequence of columns from a DF
  * @param cols  sequence of pairs. Each pair is a column name and the Column
  */
-case class ColumnSeq(val cols: Seq[(String, Column[Any])]) {
-  val sc = cols(0)._2.sc
+case class RichColumnSeq(val cols: Seq[Column[Any]]) {
+  val sc = cols(0).sc
 
   def describe() {
-    cols.foreach {
-      case (name, col) =>
-        println(name + ":")
+    cols.foreach { col =>
+        println(col.name + ":")
         println(col.toString)
     }
   }
@@ -30,11 +29,9 @@ case class ColumnSeq(val cols: Seq[(String, Column[Any])]) {
    * @tparam U  return type of the function
    * @return  a new column
    */
-  def map[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
+  def slowMap[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
     val tpe = classTag[U]
-    val zippedCols = ColumnZipper.makeRows(cols.map {
-      _._2
-    })
+    val zippedCols = ColumnZipper.makeRows(cols)
     val mapped = zippedCols.map { row => mapper(row) }
     if (tpe == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
@@ -50,9 +47,9 @@ case class ColumnSeq(val cols: Seq[(String, Column[Any])]) {
    * @tparam U  return type of the function
    * @return  a new column
    */
-  def map2[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
+  def map[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
     val tpe = classTag[U]
-    val mapped = ColumnZipper.zipAndMap(cols.map {_._2}) { row => mapper(row) }
+    val mapped = ColumnZipper.zipAndMap(cols) { row => mapper(row) }
     if (tpe == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
     else if (tpe == classTag[String])
@@ -63,7 +60,7 @@ case class ColumnSeq(val cols: Seq[(String, Column[Any])]) {
 
   override def toString() = {
     cols.map { x =>
-      "\n" + x._1 + ":\n" + x._2.toString
+      "\n" + x.name + ":\n" + x.toString
     }.reduce { (strLeft, strRight) =>
       strLeft + strRight
     }
