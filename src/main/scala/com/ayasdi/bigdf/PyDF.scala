@@ -37,7 +37,7 @@ case class PyDF(df: DF) {
   def colCount = df.colCount
 
   def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType) = {
-    df.join(sc, left, right, on, how)
+    DF.join(sc, left, right, on, how)
   }
 
   def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String): PyDF = {
@@ -67,6 +67,11 @@ object PyDF {
     val sep: Char = separator.charAt(0)
     PyDF(DF(sc, name, sep, nParts, Options()))
   }
+  def fromColumns(sc: SparkContext, pycols: JArrayList[PyColumn[Any]], name: String): PyDF = {
+    val cols = for(i <- pycols) yield i.col
+    PyDF(DF.fromColumns(sc, cols, name, Options()))
+  }
+  
 }
 
 case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
