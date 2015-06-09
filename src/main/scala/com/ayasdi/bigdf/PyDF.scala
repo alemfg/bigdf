@@ -34,7 +34,7 @@ case class PyDF(df: DF) {
 
   def rowCount = df.rowCount
 
-  def colCount = df.colCount
+  def colCount = df.columnCount
 
   def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType) = {
     DF.join(sc, left, right, on, how)

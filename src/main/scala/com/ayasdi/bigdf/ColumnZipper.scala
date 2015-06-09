@@ -5,9 +5,10 @@
  */
 package com.ayasdi.bigdf
 
-import org.apache.spark.rdd.RDD
 import scala.reflect.ClassTag
+
 import org.apache.spark.ZipImplicits._
+import org.apache.spark.rdd.RDD
 
 /**
  * Efficient methods to zip columns into rows or partial rows using RDDtoZipRDDFunctions
@@ -36,7 +37,7 @@ private[bigdf] object ColumnZipper {
    * @return RDD of columns zipped into Arrays
    */
   def makeRows(df: DF, indices: Seq[Int]): RDD[Array[Any]] = {
-    val cols = indices.map { colIndex => df.nameToColumn(df.indexToColumnName(colIndex))}
+    val cols = indices.map { colIndex => df(colIndex)}
     makeRows(cols)
   }
 
@@ -47,11 +48,9 @@ private[bigdf] object ColumnZipper {
    */
   def makeRows(cols: Seq[Column[Any]]): RDD[Array[Any]] = {
     val first = cols.head.rdd
-    val rest = cols.tail.map {
-      _.rdd
-    }
+    val rest = cols.tail.map(_.rdd)
 
-   RDDtoZipRDDFunctions(first).zip(rest)
+    RDDtoZipRDDFunctions(first).zip(rest)
   }
 
   /**
