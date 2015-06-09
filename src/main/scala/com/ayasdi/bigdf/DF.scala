@@ -49,7 +49,7 @@ case class DF private(val sc: SparkContext,
    */
   lazy val rowCount = {
     require(columnCount > 0, "No columns found")
-    nameToColumn.head._2.rdd.count
+    column(0).count
   }
 
   /**
@@ -84,7 +84,7 @@ case class DF private(val sc: SparkContext,
   }
 
   def columns(indices: Seq[Int] = 0 until columnCount) = {
-    indices.map { colIndex => nameToColumn(indexToColumnName(colIndex)) }
+    indices.map { colIndex => column(indexToColumnName(colIndex)) }
   }
 
   def schema = {
@@ -134,11 +134,11 @@ case class DF private(val sc: SparkContext,
   def writeToParquet(file: String,
                      cols: Seq[String] = columnNames): Unit = {
     val writeColNames = cols.filter {
-      nameToColumn(_).csvWritable
+      column(_).csvWritable
     }
 
-    val fields = writeColNames.map { colName => StructField(colName, nameToColumn(colName).sqlType, true) }
-    val rowRdd = ColumnZipper.zipAndMap(writeColNames.map(nameToColumn(_))) {
+    val fields = writeColNames.map { colName => StructField(colName, column(colName).sqlType, true) }
+    val rowRdd = ColumnZipper.zipAndMap(writeColNames.map(column(_))) {
       Row.fromSeq(_)
     }
     val rowsSchemaRdd = new SQLContext(sc).applySchema(rowRdd, StructType(fields))
@@ -156,7 +156,7 @@ case class DF private(val sc: SparkContext,
    * @param index column index
    * @return
    */
-  def apply(index: Int): Column[Any] = nameToColumn(indexToColumnName(index))
+  def apply(index: Int): Column[Any] = column(index)
 
   /**
    * get multiple columns by name, indices or index ranges
@@ -205,7 +205,7 @@ case class DF private(val sc: SparkContext,
       indexRange <- indexRanges;
       index <- indexRange
       if (indexToColumnName(index) != null)
-    ) yield nameToColumn(indexToColumnName(index))
+    ) yield column(indexToColumnName(index))
 
 
   /**
@@ -666,9 +666,17 @@ case class DF private(val sc: SparkContext,
    * @param colName name of the column
    */
   def column(colName: String) = {
-    val col = nameToColumn.getOrElse(colName, null)
-    if (null == col) println(s"${colName} not found")
-    col
+    require(nameToColumn.contains(colName))
+    nameToColumn.get(colName).get
+  }
+
+  /**
+   * get a column identified by name
+   * @param colIndex index of the column
+   */
+  def column(colIndex: Int) = {
+    require(indexToColumnName.contains(colIndex))
+    nameToColumn.get(indexToColumnName(colIndex)).get
   }
 
   /**

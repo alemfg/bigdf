@@ -142,8 +142,15 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
   test("Column Index: Refer to non-existent column of a DF") {
     val df = makeDF
-    val col = df("aa")
-    assert(col == null)
+    val exception = intercept[java.lang.IllegalArgumentException] {
+      df("aa")
+    }
+
+    val exception2 = intercept[java.lang.IllegalArgumentException] {
+      df("a", "bb")
+    }
+    assert(exception.getMessage.contains("requirement failed"))
+
   }
 
   test("Column Index: Refer to multiple columns of a DF") {
@@ -155,12 +162,6 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert((acol eq df("a")) === true)
     assert(bcol.name === "b")
     assert((bcol eq df("b")) === true)
-  }
-
-  test("Column Index: Refer to non-existent columns of a DF") {
-    val df = makeDF
-    val colSeq = df("a", "bb")
-    assert(colSeq(1) == null)
   }
 
   test("Column Index: Slices") {
