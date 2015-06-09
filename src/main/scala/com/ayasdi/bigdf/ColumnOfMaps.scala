@@ -23,7 +23,7 @@ class RichColumnMaps[K, V](self: Column[Map[K, V]]) {
       newColRdd.name = s"expanded_${k}"
       newColRdd.cache();
       val newCol = Column(self.sc, newColRdd)
-      df(s"${namePrefix}${k}") = newCol
+      df.setColumn(s"${namePrefix}${k}", newCol)
     }
   }
 

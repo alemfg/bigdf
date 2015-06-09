@@ -15,27 +15,6 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
 
-/**
- * For modularity column operations are grouped in several classes
- * Import these implicit conversions to make that seamless
- */
-object Implicits {
-  import scala.language.implicitConversions
-
-  implicit def columnDoubleToRichColumnDouble(col: Column[Double]) = new RichColumnDouble(col)
-  implicit def columnAnyToRichColumnDouble(col: Column[Any]) = new RichColumnDouble(col.castDouble)
-
-  implicit def columnStringToRichColumnString(col: Column[String]) = new RichColumnString(col)
-  implicit def columnAnyToRichColumnString(col: Column[Any]) = new RichColumnString(col.castString)
-
-  implicit def columnShortToRichColumnCategory(col: Column[Short]) = new RichColumnCategory(col.castShort)
-  implicit def columnAnyToRichColumnCategory(col: Column[Any]) = new RichColumnCategory(col.castShort)
-
-  implicit def columnAnyToRichColumnMap(col: Column[Any]) = new RichColumnMaps(col.castMapStringToFloat)
-
-  implicit def columnSeqToRichColumnSeq(cols: Seq[Column[Any]]) = new RichColumnSeq(cols)
-}
-
 /*
   Instead of using the typetag we use this "Enum" to make the compiler generate a
   warning when we add a new column type but forget to handle it somewhere
