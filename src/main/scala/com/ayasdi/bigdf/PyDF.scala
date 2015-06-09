@@ -68,7 +68,7 @@ object PyDF {
     PyDF(DF(sc, name, sep, nParts, Options()))
   }
   def fromColumns(sc: SparkContext, pycols: JArrayList[PyColumn[Any]], name: String): PyDF = {
-    val cols = for(i <- pycols) yield i.col
+    val cols = pycols.map(_.col)
     PyDF(DF.fromColumns(sc, cols, name, Options()))
   }
   
@@ -82,6 +82,8 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
     s"$name\t${col.colType}"
   }
 
+  def setName(name: String): Unit = { col.name = name }
+  
   def tpe = s"${col.colType}"
 
   def stats = {
