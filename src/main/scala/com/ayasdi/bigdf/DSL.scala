@@ -52,7 +52,7 @@ case class RichDF(self: DF) extends Dynamic {
    * @param items Sequence of names, indices or ranges. No mix n match yet
    */
   def apply[T: ru.TypeTag](items: T*): Seq[Column[Any]] = {
-    self.columns(items)
+    self.columns(items.toSeq)
   }
 
   /**
@@ -73,7 +73,7 @@ case class RichDF(self: DF) extends Dynamic {
    * update a column, add or replace
    */
   def update(colName: String, that: Column[Any]) = {
-
+     self.setColumn(colName, that)
   }
 
   /**

@@ -153,12 +153,12 @@ case class DF private(val sc: SparkContext,
    * or   myDF(0 to 0, 4 to 10, 6 to 1000)
    * @param items Sequence of names, indices or ranges. No mix n match yet
    */
-  def columns[T: ru.TypeTag](items: T): Seq[Column[Any]] = {
+  def columns[T: ru.TypeTag](items: Seq[T]): Seq[Column[Any]] = {
     val tpe = ru.typeOf[T]
-//
-//    require(tpe =:= ru.typeOf[Int] || tpe =:= ru.typeOf[String] ||
-//      tpe =:= ru.typeOf[Range] || tpe =:= ru.typeOf[Inclusive],
-//      s"Unexpected argument list of type $tpe")
+
+    require(tpe =:= ru.typeOf[Int] || tpe =:= ru.typeOf[String] ||
+      tpe =:= ru.typeOf[Range] || tpe =:= ru.typeOf[Inclusive],
+      s"Unexpected argument list of type $tpe")
 
     if (tpe =:= ru.typeOf[Int])
       columnsByIndices(items.asInstanceOf[Seq[Int]])
@@ -318,37 +318,37 @@ case class DF private(val sc: SparkContext,
       col.colType match {
         case ColType.Double => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Double] }
-          Column(sc, colRdd, i, colName)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.Float => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Float] }
-          Column(sc, colRdd, i, colName)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.Short => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Short] }
-          Column(sc, colRdd, i, colName)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.String => {
           val colRdd = rows.map { row => row(i).asInstanceOf[String] }
-          Column(sc, colRdd, i, colName)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.ArrayOfString => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Array[String]] }
-          Column(sc, colRdd, i, colName)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.ArrayOfDouble => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Array[Double]] }
-          Column(sc, colRdd, i, colName)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.MapOfStringToFloat => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Map[String, Float]] }
-          Column(sc, colRdd, i, colName)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.Undefined =>
@@ -1095,7 +1095,7 @@ object DF {
     def unionRdd[T: ClassTag](rdds: List[RDD[T]]) = new UnionRDD[T](sc, rdds)
 
     for (i <- 0 until dfs.head.columnCount) {
-      val unionCol = dfs.head.columns()(i).colType match {
+      val unionCol = dfs.head.column(i).colType match {
         case ColType.Double => {
           val cols = dfs.map { df => df.column(i).doubleRdd }
           Column(sc, unionRdd(cols), i)
