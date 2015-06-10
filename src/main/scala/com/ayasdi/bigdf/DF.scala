@@ -5,6 +5,7 @@
  */
 package com.ayasdi.bigdf
 
+import scala.collection.immutable.Range.Inclusive
 import scala.collection.mutable.HashMap
 import scala.language.dynamics
 import scala.reflect.runtime.{universe => ru}
@@ -26,7 +27,7 @@ object JoinType extends Enumeration {
 }
 
 /**
- * Data Frame is a map of column name to an RDD containing that column.
+ * Data Frame is a map of column names to RDD(s) containing those columns.
  * Constructor is private, instances are created by factory calls(apply) in
  * companion object.
  * Number of rows cannot change. Columns can be added, removed, modified.
@@ -42,7 +43,7 @@ case class DF private(val sc: SparkContext,
                       val nameToColumn: HashMap[String, Column[Any]] = new HashMap[String, Column[Any]],
                       val indexToColumnName: HashMap[Int, String] = new HashMap[Int, String],
                       val options: Options,
-                      val name: String) extends Dynamic {
+                      val name: String) {
   /**
    * number of rows in df, this cannot change. any operation that changes this returns a new df
    * @return number of rows
@@ -74,7 +75,7 @@ case class DF private(val sc: SparkContext,
   private def rowsRdd = {
     if (rowsRddCached.isEmpty) {
       rowsRddCached = Some(computeRows)
-      rowsRddCached.get.setName(s"${name}").persist(storageLevel)
+      rowsRddCached.get.setName(s"rows_for_${name}").persist(storageLevel)
     }
     rowsRddCached.get
   }
@@ -146,48 +147,64 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * get a column identified by name
-   * @param colName name of the column
-   */
-  def apply(colName: String) = column(colName)
-
-  /**
-   * get a column with given index
-   * @param index column index
-   * @return
-   */
-  def apply(index: Int): Column[Any] = column(index)
-
-  /**
    * get multiple columns by name, indices or index ranges
    * e.g. myDF("x", "y")
    * or   myDF(0, 1, 6)
    * or   myDF(0 to 0, 4 to 10, 6 to 1000)
    * @param items Sequence of names, indices or ranges. No mix n match yet
    */
-  def apply[T: ru.TypeTag](items: T*): Seq[Column[Any]] = {
+  def columns[T: ru.TypeTag](items: Seq[T]): Seq[Column[Any]] = {
     val tpe = ru.typeOf[T]
 
     require(tpe =:= ru.typeOf[Int] || tpe =:= ru.typeOf[String] ||
-      tpe =:= ru.typeOf[Range] || tpe =:= ru.typeOf[Range.Inclusive],
+      tpe =:= ru.typeOf[Range] || tpe =:= ru.typeOf[Inclusive],
       s"Unexpected argument list of type $tpe")
 
     if (tpe =:= ru.typeOf[Int])
       columnsByIndices(items.asInstanceOf[Seq[Int]])
     else if (tpe =:= ru.typeOf[String])
       columnsByNames(items.asInstanceOf[Seq[String]])
-    else if (tpe =:= ru.typeOf[Range] || tpe =:= ru.typeOf[Range.Inclusive])
+    else if (tpe =:= ru.typeOf[Range] || tpe =:= ru.typeOf[Inclusive])
       columnsByRanges(items.asInstanceOf[Seq[Range]])
     else null
   }
 
-  /**
-   * refer to a column 'c' in DF 'df' as df.c equivalent to df("c")
-   */
-  def selectDynamic(colName: String) = {
-    val col = column(colName)
-    if (col == null) println(s"$colName does not match any DF API or column name")
-    col
+  def setColumn(colName: String, that: Column[Any]) = {
+    require(that.df.isEmpty && that.index == -1)
+
+    val col = nameToColumn.get(colName)
+    nameToColumn(colName) = that
+    if (!col.isEmpty) {
+      println(s"Replaced Column: ${colName}")
+      that.index = col.get.index
+    } else {
+      println(s"New Column: ${colName}")
+      val colIndex = indexToColumnName.size
+      indexToColumnName.put(colIndex, colName)
+      that.index = colIndex
+    }
+    that.name = colName
+    that.df = Some(this)
+    rowsRddCached = None //invalidate cached rows
+    //FIXME: incremental computation of rows
+  }
+
+  //FIXME: unit test
+  def setColumn(colIndex: Int, that: Column[Any]) = {
+    require(that.df.isEmpty && that.index == -1 && colIndex < columnCount && column(that.name) == null)
+
+    val col = Some(column(colIndex))
+    nameToColumn(that.name) = that
+    if (!col.isEmpty) {
+      println(s"Replaced Column: ${col.get.name}")
+    } else {
+      println(s"New Column: ${that.name}")
+    }
+    indexToColumnName.put(colIndex, that.name)
+    that.index = colIndex
+    that.df = Some(this)
+    rowsRddCached = None //invalidate cached rows
+    //FIXME: incremental computation of rows
   }
 
   /**
@@ -220,11 +237,6 @@ case class DF private(val sc: SparkContext,
     val indexRanges = indices.map { i => i to i }
     columnsByRanges(indexRanges)
   }
-
-  /**
-   * allow omitting keyword "where"
-   */
-  def apply(cond: Predicate) = where(cond)
 
   /**
    * wrapper on filter to create a new DF from filtered RDD
@@ -292,57 +304,59 @@ case class DF private(val sc: SparkContext,
     zippedColRdd.map(cols => cond.checkWithColStrategy(cols, colMap))
   }
 
+  /**
+   * using same schema as current DF, create a new one with different rows
+   * used by filter() and other methods
+   * @param rows
+   * @return
+   */
   private def fromRows(rows: RDD[Array[Any]]) = {
-    val newDf = new DF(sc,
-      indexToColumnName = this.indexToColumnName.clone,
-      name = this.name + "-fromRows",
-      options = this.options)
-    //replace col.rdd in this df to get newDf
-    this.nameToColumn.foreach { case (colName, col) =>
+    val newColumns = columns().map { col =>
       val i = col.index
-      col.colType match {
+      val colName = col.name
 
+      col.colType match {
         case ColType.Double => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Double] }
-          newDf.nameToColumn(colName) = Column(sc, colRdd, i)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.Float => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Float] }
-          newDf.nameToColumn(colName) = Column(sc, colRdd, i)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.Short => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Short] }
-          newDf.nameToColumn(colName) = Column(sc, colRdd, i)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.String => {
           val colRdd = rows.map { row => row(i).asInstanceOf[String] }
-          newDf.nameToColumn(colName) = Column(sc, colRdd, i)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.ArrayOfString => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Array[String]] }
-          newDf.nameToColumn(colName) = Column(sc, colRdd, i)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.ArrayOfDouble => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Array[Double]] }
-          newDf.nameToColumn(colName) = Column(sc, colRdd, i)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.MapOfStringToFloat => {
           val colRdd = rows.map { row => row(i).asInstanceOf[Map[String, Float]] }
-          newDf.nameToColumn(colName) = Column(sc, colRdd, i)
+          Column(sc, colRdd, -1, colName)
         }
 
         case ColType.Undefined =>
-          println(s"fromRows: Unhandled type ${col.tpe}")
+          throw new Exception(s"fromRows: Unhandled type ${col.tpe}")
       }
-
     }
-    newDf
+
+    DF.fromColumns(sc, newColumns, s"${name}_fromRows", options)
   }
 
   /**
@@ -619,9 +633,9 @@ case class DF private(val sc: SparkContext,
         add key column to output
      */
     column(keyCol).colType match {
-      case ColType.String => newDf.update(s"$keyCol",
+      case ColType.String => newDf.setColumn(s"$keyCol",
           Column(sc, grped.map(_._1.asInstanceOf[String])))
-      case ColType.Double =>  newDf.update(s"$keyCol",
+      case ColType.Double =>  newDf.setColumn(s"$keyCol",
           Column(sc, grped.map(_._1.asInstanceOf[Double])))
       case _ => {
         println(s"Pivot does not yet support columns ${column(keyCol)}")
@@ -641,7 +655,7 @@ case class DF private(val sc: SparkContext,
               case (k, v) =>
                 if (v.isEmpty) Double.NaN else v.head(pivotedColIndex).asInstanceOf[Double]
             }
-            newDf.update(s"D_${indexToColumnName(pivotedColIndex)}@$pivotByCol==$pivotValue",
+            newDf.setColumn(s"D_${indexToColumnName(pivotedColIndex)}@$pivotByCol==$pivotValue",
               Column(sc, newColRdd.asInstanceOf[RDD[Double]]))
           }
           case ColType.String => {
@@ -649,7 +663,7 @@ case class DF private(val sc: SparkContext,
               case (k, v) =>
                 if (v.isEmpty) "" else v.head(pivotedColIndex).asInstanceOf[String]
             }
-            newDf.update(s"S_${indexToColumnName(pivotedColIndex)}@$pivotByCol==$pivotValue",
+            newDf.setColumn(s"S_${indexToColumnName(pivotedColIndex)}@$pivotByCol==$pivotValue",
               Column(sc, newColRdd.asInstanceOf[RDD[String]]))
           }
           case _ => {
@@ -671,41 +685,13 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * get a column identified by name
+   * get a column identified by numerical index
    * @param colIndex index of the column
    */
   def column(colIndex: Int) = {
     require(indexToColumnName.contains(colIndex))
     nameToColumn.get(indexToColumnName(colIndex)).get
   }
-
-  /**
-   * update a column, add or replace
-   */
-  def update(colName: String, that: Column[Any]) = {
-    require(that.df.isEmpty && that.index == -1)
-
-    val col = nameToColumn.get(colName)
-    nameToColumn(colName) = that
-    if (!col.isEmpty) {
-      println(s"Replaced Column: ${colName}")
-      that.index = col.get.index
-    } else {
-      println(s"New Column: ${colName}")
-      val colIndex = indexToColumnName.size
-      indexToColumnName.put(colIndex, colName)
-      that.index = colIndex
-    }
-    that.name = colName
-    that.df = Some(this)
-    rowsRddCached = None //invalidate cached rows
-    //FIXME: incremental computation of rows
-  }
-
-  /**
-   * update a column "c" of DF "df" like df.c = .. equivalent df("c") = ...
-   */
-  def updateDynamic(colName: String)(that: Column[Any]) = update(colName, that)
 
   def delete(colName: String): Unit = {
     require(nameToColumn.contains(colName))
@@ -811,7 +797,7 @@ object DF {
     cols.foreach { col => require(col.rdd.partitions.length == cols.head.rdd.partitions.length) }
     val df = DF(sc, s"$dfName", options)
     cols.foreach { col =>
-      df(col.name) = col
+      df.setColumn(col.name, col)
     }
     df
   }
@@ -1015,7 +1001,7 @@ object DF {
         val origIndex = joinedIndex - start
         val newColName = joinedColumnName(curDf.indexToColumnName(origIndex), start)
 
-        val column = curDf(origIndex).colType match {
+        val column = curDf.column(origIndex).colType match {
           case ColType.Double => {
             val colRdd = joinedRows.map { row => partGetter(row)(origIndex).asInstanceOf[Double] }
             Column(curDf.sc, colRdd, joinedIndex)
@@ -1110,37 +1096,37 @@ object DF {
     def unionRdd[T: ClassTag](rdds: List[RDD[T]]) = new UnionRDD[T](sc, rdds)
 
     for (i <- 0 until dfs.head.columnCount) {
-      val unionCol = dfs.head.columns()(i).colType match {
+      val unionCol = dfs.head.column(i).colType match {
         case ColType.Double => {
-          val cols = dfs.map { df => df(i).doubleRdd }
+          val cols = dfs.map { df => df.column(i).doubleRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.Float => {
-          val cols = dfs.map { df => df(i).floatRdd }
+          val cols = dfs.map { df => df.column(i).floatRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.String => {
-          val cols = dfs.map { df => df(i).stringRdd }
+          val cols = dfs.map { df => df.column(i).stringRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.ArrayOfString => {
-          val cols = dfs.map { df => df(i).arrayOfStringRdd }
+          val cols = dfs.map { df => df.column(i).arrayOfStringRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.ArrayOfDouble => {
-          val cols = dfs.map { df => df(i).arrayOfDoubleRdd }
+          val cols = dfs.map { df => df.column(i).arrayOfDoubleRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.Short => {
-          val cols = dfs.map { df => df(i).shortRdd }
+          val cols = dfs.map { df => df.column(i).shortRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.MapOfStringToFloat => {
-          val cols = dfs.map { df => df(i).mapOfStringToFloatRdd }
+          val cols = dfs.map { df => df.column(i).mapOfStringToFloatRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.Undefined => {
-          throw new RuntimeException(s"ERROR: Column type UNKNOWN for ${df(i)}")
+          throw new RuntimeException(s"ERROR: Column type UNKNOWN for ${df.column(i)}")
         }
       }
       val colName = df.indexToColumnName(i)

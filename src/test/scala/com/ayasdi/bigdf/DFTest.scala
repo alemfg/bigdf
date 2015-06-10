@@ -131,7 +131,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(colA.rdd.count === 3)
     val col0 = df(0)
     assert((col0 eq colA) === true)
-    val colDotA = df.a
+    val colDotA = RichDF(df).a
     assert((colDotA eq colA) === true)
   }
 
@@ -354,10 +354,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df("new") = df("a") / df("b")
     assert(df("new").doubleRdd.first === aa / bb)
 
-    df.newCol = df.a + df.b
-    assert(df.newCol.doubleRdd.first === aa + bb)
-    df.newCol = df.a.makeCopy
-    assert(df.newCol.doubleRdd.first === aa)
+    RichDF(df).newCol = RichDF(df).a + RichDF(df).b
+    assert(RichDF(df).newCol.doubleRdd.first === aa + bb)
+    RichDF(df).newCol = RichDF(df).a.makeCopy
+    assert(RichDF(df).newCol.doubleRdd.first === aa)
   }
 
   test("Column Ops: New column as simple function of existing column and scalar") {
