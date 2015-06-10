@@ -5,7 +5,10 @@
  */
 package com.ayasdi.bigdf
 
+import java.util.{HashMap => JHashMap}
+
 import scala.reflect.ClassTag
+import scala.reflect.runtime.{universe => ru}
 
 import org.apache.spark.ZipImplicits._
 import org.apache.spark.rdd.RDD
@@ -37,7 +40,7 @@ private[bigdf] object ColumnZipper {
    * @return RDD of columns zipped into Arrays
    */
   def makeRows(df: DF, indices: Seq[Int]): RDD[Array[Any]] = {
-    val cols = indices.map { colIndex => df.column(colIndex)}
+    val cols = indices.map { colIndex => df.column(colIndex) }
     makeRows(cols)
   }
 
@@ -58,14 +61,12 @@ private[bigdf] object ColumnZipper {
    */
   def zipAndMap[U: ClassTag](cols: Seq[Column[Any]])(mapper: Array[Any] => U): RDD[U] = {
     val first = cols.head.rdd
-    val rest = cols.tail.map {
-      _.rdd
-    }
+    val rest = cols.tail.map(_.rdd)
 
     RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
       val temp = new Array[Any](iterSeq.length)
       new Iterator[U] {
-        def hasNext = !iterSeq.exists(!_.hasNext)  //FIXME: catch exception instead and make this faster
+        def hasNext = !iterSeq.exists(!_.hasNext) //FIXME: catch exception instead and make this faster
 
         def next = {
           var i = 0
@@ -75,6 +76,53 @@ private[bigdf] object ColumnZipper {
           }
           mapper(temp)
         }
+      }
+    }
+  }
+
+  /**
+   * zip columns and apply mapper to zipped object
+   */
+  def zipAndMapSideCombine[K, C: ru.TypeTag, V: ru.TypeTag](keyCols: Seq[Column[Any]],
+                                                            valueCol: RDD[V],
+                                                            createKey: Array[Any] => K,
+                                                            createCombiner: V => C,
+                                                            mergeValue: (C, V) => C): RDD[(K, C)] = {
+    val first = valueCol
+    val rest = keyCols.map(_.rdd)
+
+    val vClassTag = SparkUtil.typeTagToClassTag[V]
+
+    RDDtoZipRDDFunctions(first)(vClassTag).zipPartitions[(K, C)](rest, false) { iterSeq =>
+      zipAndMapSideCombiner(iterSeq, createKey, createCombiner, mergeValue)
+    }
+  }
+
+  def zipAndMapSideCombiner[K, C, V](iterSeq: Seq[Iterator[Any]],
+                                     createKey: Array[Any] => K,
+                                     createCombiner: V => C,
+                                     mergeValue: (C, V) => C) = {
+    val temp = new Array[Any](iterSeq.length)
+    val map = new JHashMap[K, C]
+    val valueColIter = iterSeq.head
+    valueColIter.foreach { element =>
+      val v = element.asInstanceOf[V]
+      var i = 0
+      iterSeq.tail.foreach { iter =>
+        temp(i) = iter.next
+        i += 1
+      }
+      val k = createKey(temp)
+      val old = map.get(k)
+      map.put(k, if (old == null) createCombiner(v) else mergeValue(old, v))
+    }
+    val mapIter = map.entrySet().iterator()
+    new Iterator[(K, C)] {
+      def hasNext = mapIter.hasNext()
+
+      def next = {
+        val x = mapIter.next()
+        (x.getKey, x.getValue)
       }
     }
   }
@@ -98,7 +146,8 @@ private[bigdf] object ColumnZipper {
         }
 
         def next() = if (hasNext) {
-          hdDefined = false; hd
+          hdDefined = false;
+          hd
         } else throw new NoSuchElementException("next on empty iterator")
       }
     }

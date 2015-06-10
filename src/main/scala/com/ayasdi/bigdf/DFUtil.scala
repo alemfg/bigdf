@@ -7,6 +7,8 @@ package com.ayasdi.bigdf
 
 import java.io.File
 
+import scala.reflect.runtime.{universe => ru}
+import scala.reflect.{ClassTag, classTag}
 import org.apache.log4j.{Level, Logger}
 
 import org.apache.spark.SparkContext
@@ -127,4 +129,13 @@ object SparkUtil {
     case _ => throw new Exception("Unsupported type")
   }
 
+  def typeTagToClassTag[V: ru.TypeTag] = {
+    val mirror = ru.runtimeMirror(getClass.getClassLoader)
+    ClassTag[V](mirror.runtimeClass(ru.typeOf[V]))
+  }
+
+}
+
+object KeyMaker {
+  def makeKey(a: Array[Any]) = a.toList
 }

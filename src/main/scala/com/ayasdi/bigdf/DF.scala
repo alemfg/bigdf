@@ -8,8 +8,8 @@ package com.ayasdi.bigdf
 import scala.collection.immutable.Range.Inclusive
 import scala.collection.mutable.HashMap
 import scala.language.dynamics
+import scala.reflect.ClassTag
 import scala.reflect.runtime.{universe => ru}
-import scala.reflect.{ClassTag, classTag}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.{RDD, UnionRDD}
@@ -455,7 +455,7 @@ case class DF private(val sc: SparkContext,
    * @tparam V
    * @return new DF with first column aggByCol and second aggedCol
    */
-  def aggregate[U: ClassTag, V: ClassTag, W: ClassTag](aggByCol: String,
+  def aggregate[U: ru.TypeTag, V: ru.TypeTag, W: ru.TypeTag](aggByCol: String,
                                                        aggedCol: String,
                                                        aggtor: Aggregator[U, V, W]) = {
     aggregateWithColumnStrategy(List(aggByCol), aggedCol, aggtor)
@@ -464,15 +464,21 @@ case class DF private(val sc: SparkContext,
   /**
    * aggregate one column after grouping by another
    */
-  private def aggregateWithColumnStrategy[U: ClassTag, V: ClassTag, W: ClassTag](aggdByCols: Seq[String],
-                                                                                 aggdCol: String,
-                                                                                 aggtor: Aggregator[U, V, W]) = {
+  private def aggregateWithColumnStrategy[V: ru.TypeTag, C: ru.TypeTag, W: ru.TypeTag]
+    (aggdByCols: Seq[String], aggdCol: String, aggtor: Aggregator[V, C, W]) = {
 
-    val wtpe = classTag[W]
-    if (aggtor != AggCount) require(column(aggdCol).compareType(classTag[U]))
+    val wtpe = ru.typeTag[W]
+    if (aggtor != AggCount) require(column(aggdCol).tpe =:= ru.typeOf[V])
 
-    val aggedRdd = keyBy(aggdByCols, aggdCol).asInstanceOf[RDD[(List[Any], U)]]
+    implicit val vClassTag = SparkUtil.typeTagToClassTag[V]
+
+    val aggedRdd = keyBy(aggdByCols, aggdCol).asInstanceOf[RDD[(List[Any], V)]]
       .combineByKey(aggtor.convert, aggtor.mergeValue, aggtor.mergeCombiners)
+
+    val keyCols = aggdByCols.map(column(_))
+    val valueColRdd = column(aggdCol).getRdd[V]
+
+    val x = ColumnZipper.zipAndMapSideCombine(keyCols, valueColRdd, KeyMaker.makeKey, aggtor.convert, aggtor.mergeValue)
 
     aggedRdd.cache()
 
@@ -534,20 +540,20 @@ case class DF private(val sc: SparkContext,
     }
 
     // finalize the aggregations and add column of that
-    val aggdColumnInResult = if (wtpe == classTag[Double]) {
+    val aggdColumnInResult = if (wtpe.tpe =:= ru.typeOf[Double]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
-      }.asInstanceOf[RDD[Double]]
+      }(SparkUtil.typeTagToClassTag[W]).asInstanceOf[RDD[Double]]
       Column(sc, col1)
-    } else if (wtpe == classTag[String]) {
+    } else if (wtpe.tpe == ru.typeOf[String]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
-      }.asInstanceOf[RDD[String]]
+      }(SparkUtil.typeTagToClassTag[W]).asInstanceOf[RDD[String]]
       Column(sc, col1)
-    } else if(wtpe == classTag[Array[String]]) {
+    } else if (wtpe.tpe == ru.typeOf[Array[String]]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
-      }.asInstanceOf[RDD[Array[String]]]
+      }(SparkUtil.typeTagToClassTag[W]).asInstanceOf[RDD[Array[String]]]
       Column(sc, col1)
     } else {
       throw new RuntimeException(s"ERROR: aggregate value type $wtpe")
@@ -576,7 +582,7 @@ case class DF private(val sc: SparkContext,
    * @tparam V
    * @return new DF with first column aggByCol and second aggedCol
    */
-  def aggregate[U: ClassTag, V: ClassTag, W: ClassTag](aggByCols: Seq[String],
+  def aggregate[U: ru.TypeTag, V: ru.TypeTag, W: ru.TypeTag](aggByCols: Seq[String],
                                                        aggedCol: Seq[String],
                                                        aggtor: Aggregator[U, V, W]) = {
     aggregateWithColumnStrategy(aggByCols, aggedCol.head, aggtor)
