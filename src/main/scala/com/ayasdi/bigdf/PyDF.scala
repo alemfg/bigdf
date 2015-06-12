@@ -199,4 +199,7 @@ object ClassTagUtil {
   val string = classTag[String]
 }
 
-
+object TypeTagUtil {
+  val double = ru.typeOf[Double]
+  val string = ru.typeOf[String]
+}
