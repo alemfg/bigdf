@@ -83,6 +83,7 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   }
 
   def setName(name: String): Unit = { col.name = name }
+  def name = col.name
   
   def tpe = s"${col.colType}"
 
