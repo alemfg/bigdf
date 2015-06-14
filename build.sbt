@@ -28,7 +28,7 @@ libraryDependencies ++= Seq(
 
 
 libraryDependencies ++= Seq(
-  ("org.apache.spark" %% "spark-sql" % "1.3.1").
+  ("org.apache.spark" %% "spark-sql" % "1.4.0").
 //    exclude("org.mortbay.jetty", "servlet-api").
     exclude("commons-beanutils", "commons-beanutils-core").
     exclude("commons-collections", "commons-collections").
