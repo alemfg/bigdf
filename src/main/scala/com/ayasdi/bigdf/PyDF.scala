@@ -201,6 +201,6 @@ object ClassTagUtil {
 }
 
 object TypeTagUtil {
-  val double = ru.typeOf[Double]
-  val string = ru.typeOf[String]
+  val double = ru.typeTag[Double]
+  val string = ru.typeTag[String]
 }
