@@ -6,6 +6,7 @@
 package com.ayasdi.bigdf
 
 import java.util.{ArrayList => JArrayList}
+import java.util.{HashMap => JHashMap}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -20,6 +21,8 @@ import com.ayasdi.bigdf.Implicits._
 case class PyDF(df: DF) {
   def columnNames = df.columnNames
 
+  def rename(columns: JHashMap[String, String], inPlace: Boolean) =
+    df.rename(columns.toMap, inPlace)
   def column(name: String) = PyColumn(df.column(name))
 
   def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)
@@ -59,7 +62,12 @@ case class PyDF(df: DF) {
     PyDF(df.pivot(keyCol, pivotByCol, pivotedCols.asScala.toList))
   }
 
-  def writeToCSV(file: String, separator: String = ","): Unit = df.writeToCSV(file, separator)
+  def writeToCSV(file: String, separator: String, singlePart: Boolean,
+    cols: JArrayList[String]): Unit =
+    df.writeToCSV(file, separator, singlePart, cols.asScala.toList)
+  def writeToParquet(file: String, cols: JArrayList[String]): Unit =
+    df.writeToParquet(file, cols.asScala.toList)
+
 }
 
 object PyDF {
@@ -71,7 +79,9 @@ object PyDF {
     val cols = pycols.map(_.col)
     PyDF(DF.fromColumns(sc, cols, name, Options()))
   }
-  
+  def readParquet(sc: SparkContext, infile: String): PyDF = {
+    PyDF(DF.fromParquet(sc, infile, Options()))
+  }
 }
 
 case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
@@ -203,4 +213,9 @@ object ClassTagUtil {
 object TypeTagUtil {
   val double = ru.typeTag[Double]
   val string = ru.typeTag[String]
+}
+
+object OrderingUtil {
+  val double = scala.math.Ordering.Double
+  val string = scala.math.Ordering.String  
 }
