@@ -253,6 +253,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df("cat_f1").parseErrors.value === 2)
   }
 
+  test("Row index") {
+    val df = makeDF
+    val df2 = df.rowsByRange(1 until 2)
+    assert(df2("a").doubleRdd.collect() === Array(12.0, 13.0))
+  }
+
   test("Filter/Select: Double Column comparisons with Scalar") {
     val df = makeDF
     val dfEq12 = df(df("a") === 12)

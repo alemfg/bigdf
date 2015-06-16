@@ -83,6 +83,43 @@ private[bigdf] object ColumnZipper {
   /**
    * zip columns and apply mapper to zipped object
    */
+  def zipAndFilter(cols: Seq[Column[Any]])(matcher: Array[Any] => Boolean): RDD[Boolean] = {
+    val first = cols.head.rdd
+    val rest = cols.tail.map(_.rdd)
+
+    RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
+      val temp = new Array[Any](iterSeq.length)
+      new Iterator[Boolean] {
+        var validNextOne = false
+        var nextOne = false
+        def hasNext = if(!iterSeq.exists(!_.hasNext)) {
+          false
+        } else {
+          while(!nextOne) tryNext
+          true
+        } //FIXME: catch exception instead and make this faster
+
+        def tryNext = {
+          var i = 0
+          iterSeq.foreach { iter =>
+            temp(i) = iter.next
+            i += 1
+          }
+          nextOne = matcher(temp)
+        }
+
+        def next = {
+          val thisOne = nextOne
+          while(!nextOne) tryNext
+          thisOne
+        }
+      }
+    }
+  }
+
+  /**
+   * zip columns and apply mapper to zipped object
+   */
   def zipAndMapSideCombine[K, C: ru.TypeTag, V: ru.TypeTag](keyCols: Seq[Column[Any]],
                                                             valueCol: RDD[V],
                                                             createKey: Array[Any] => K,

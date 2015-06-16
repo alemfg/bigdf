@@ -16,6 +16,7 @@ import org.apache.spark.rdd.{RDD, UnionRDD}
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
+import com.ayasdi.bigdf.Implicits._
 import com.ayasdi.bigdf.readers.{BulkCsvReader, LineCsvReader}
 
 /**
@@ -51,6 +52,14 @@ case class DF private(val sc: SparkContext,
   lazy val rowCount = {
     require(columnCount > 0, "No columns found")
     column(0).count
+  }
+
+  lazy val rowIndexRdd = column(0).rdd.zipWithIndex().map(_._2.toDouble)
+
+  def rowIndexCol = {
+    val col = Column[Double](sc, rowIndexRdd, -1, "rowIndexCol")
+    setColumn("rowIndexCol", col)
+    col
   }
 
   /**
@@ -248,6 +257,13 @@ case class DF private(val sc: SparkContext,
     } else {
       filter(filterColumnStrategy(cond))
     }
+  }
+
+  def rowsByRange(indexRange: Range): DF = {
+    val pred = (rowIndexCol >= indexRange.start.toDouble) &&
+      (rowIndexCol <= indexRange.end.toDouble)
+
+    where(pred)
   }
 
   /**
