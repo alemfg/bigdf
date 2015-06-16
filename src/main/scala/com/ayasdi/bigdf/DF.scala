@@ -398,7 +398,7 @@ case class DF private(val sc: SparkContext,
    * number of columns that have NA
    */
   def countColsWithNA = {
-    nameToColumn.map { col => if (col._2.hasNA) 1 else 0 }.reduce { _ + _ }
+    columns().map { col => if (col.hasNA) 1 else 0 }.reduce { _ + _ }
   }
 
   /**
@@ -478,7 +478,8 @@ case class DF private(val sc: SparkContext,
     val keyCols = aggdByCols.map(column(_))
     val valueColRdd = column(aggdCol).getRdd[V]
 
-    val x = ColumnZipper.zipAndMapSideCombine(keyCols, valueColRdd, KeyMaker.makeKey, aggtor.convert, aggtor.mergeValue)
+    val x = ColumnZipper.zipAndMapSideCombine(
+      keyCols, valueColRdd, KeyMaker.makeKey, aggtor.convert, aggtor.mergeValue)
 
     aggedRdd.cache()
 
@@ -792,7 +793,7 @@ object DF {
    * @param nParts number of parts to process in parallel
    */
   def apply(sc: SparkContext, inFile: String, separator: Char, nParts: Int, options: Options): DF = {
-    if (FileUtils.isDir(inFile)(sc)) fromCSVDir(sc, inFile, separator, nParts, options)
+    if (FileUtils.isDir(inFile)(sc)) fromCSVDir(sc, inFile, ".*", true, separator, nParts, options)
     else fromCSVFile(sc, inFile, separator, nParts, options = options)
   }
 
@@ -817,8 +818,14 @@ object DF {
    * @param separator The field separator e.g. ',' for CSV file
    * @param nParts number of parts to process in parallel
    */
-  def fromCSVDir(sc: SparkContext, inDir: String, separator: Char, nParts: Int, options: Options): DF = {
-    val files = FileUtils.dirToFiles(inDir)(sc)
+  def fromCSVDir(sc: SparkContext,
+                 inDir: String,
+                 pattern: String,
+                 recursive: Boolean,
+                 separator: Char,
+                 nParts: Int,
+                 options: Options): DF = {
+    val files = FileUtils.dirToFiles(inDir, recursive, pattern)(sc)
     val numPartitions = if (nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
     val dfs = files.map { file => fromCSVFile(sc, file, separator, numPartitions) }
     union(sc, dfs)

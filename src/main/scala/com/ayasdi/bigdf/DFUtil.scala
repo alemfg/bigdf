@@ -7,8 +7,9 @@ package com.ayasdi.bigdf
 
 import java.io.File
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.{universe => ru}
-import scala.reflect.{ClassTag, classTag}
+
 import org.apache.log4j.{Level, Logger}
 
 import org.apache.spark.SparkContext
@@ -67,16 +68,22 @@ object FileUtils {
     }
   }
 
-  def dirToFiles(path: String, recursive: Boolean = true)(implicit sc: SparkContext) = {
+  def dirToFiles(path: String, recursive: Boolean = true, pattern: String)(implicit sc: SparkContext) = {
     import scala.collection.mutable.MutableList
-
     import org.apache.hadoop.fs._
+
     val fs = FileSystem.get(sc.hadoopConfiguration)
     val files = fs.listFiles(new Path(path), recursive)
     val fileList = MutableList[String]()
+    val regex = pattern.r
     while (files.hasNext) {
       val file = files.next
-      if (file.isFile) fileList += file.getPath.toUri.getPath
+      if (file.isFile) {
+        val path = file.getPath.toUri.getPath
+        val matched = regex.findFirstIn(path)
+        if(matched.nonEmpty && matched.get == path)
+          fileList += file.getPath.toUri.getPath
+      }
     }
 
     fileList.toList

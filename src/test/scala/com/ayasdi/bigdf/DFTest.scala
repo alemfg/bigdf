@@ -120,6 +120,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df.list()
     assert(df.columnCount === 4)
     assert(df.rowCount === 8)
+
+    val df2 = DF.fromCSVDir(sc, "src/test/resources/multiFile", """.*\.csv""", false, ',', 0, Options())
+    assert(df2.columnCount === 4)
+    assert(df2.rowCount === 8)
   }
 
   test("Column Index: Refer to a column of a DF") {
@@ -145,12 +149,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     val exception = intercept[java.lang.IllegalArgumentException] {
       df("aa")
     }
+    assert(exception.getMessage.contains("requirement failed"))
 
     val exception2 = intercept[java.lang.IllegalArgumentException] {
       df("a", "bb")
     }
-    assert(exception.getMessage.contains("requirement failed"))
-
+    assert(exception2.getMessage.contains("requirement failed"))
   }
 
   test("Column Index: Refer to multiple columns of a DF") {
