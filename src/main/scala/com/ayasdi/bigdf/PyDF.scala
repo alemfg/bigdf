@@ -45,7 +45,13 @@ case class PyDF(df: DF) {
     val aggrColumn = aggrColumnJ.asScala.toList
     val dfAgg = aggregator match {
       case "Mean" => df.aggregate(byColumn, aggrColumn, AggMean)
-      case "Count" => df.aggregate(byColumn, aggrColumn, AggCount)
+      case "Count" => {
+        df(aggrColumn.head).colType match {
+          case ColType.Double => df.aggregate(byColumn, aggrColumn, AggCountDouble)
+          case ColType.String => df.aggregate(byColumn, aggrColumn, AggCountString)
+          case _ => throw new IllegalArgumentException("Count not yet supported for this column type")
+        }
+      }
       case "StrJoin" => df.aggregate(byColumn, aggrColumn, new AggMakeString(","))
       case _ => null
     }

@@ -263,7 +263,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * @return RDD of R's. throws exception if the cast is not applicable to this column
    */
   def getRdd[R: ru.TypeTag] = {
-     require(ru.typeOf[R] =:= ru.typeOf[T])
+     require(ru.typeOf[R] =:= ru.typeOf[T], s"s${ru.typeOf[R]} does not match s${ru.typeOf[T]}")
      rdd.asInstanceOf[RDD[R]]
   }
 

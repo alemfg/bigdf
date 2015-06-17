@@ -482,10 +482,9 @@ case class DF private(val sc: SparkContext,
    */
   private def aggregateWithColumnStrategy[V: ru.TypeTag, C: ru.TypeTag, W: ru.TypeTag]
     (aggdByCols: Seq[String], aggdCol: String, aggtor: Aggregator[V, C, W]) = {
+    require(column(aggdCol).tpe =:= ru.typeOf[V])
 
     val wtpe = ru.typeTag[W]
-    if (aggtor != AggCount) require(column(aggdCol).tpe =:= ru.typeOf[V])
-
     implicit val vClassTag = SparkUtil.typeTagToClassTag[V]
 
     val aggedRdd = keyBy(aggdByCols, aggdCol).asInstanceOf[RDD[(List[Any], V)]]

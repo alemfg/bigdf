@@ -424,10 +424,15 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   test("Aggregate") {
     val df = makeDF
     df("groupByThis") = df("a").dbl_map { x => 1.0 }
+
     val sumOfA = df.aggregate("groupByThis", "a", AggSimple)
     assert(sumOfA("a").doubleRdd.first === df("a").doubleRdd.sum)
+
     val arrOfA = df.aggregate("groupByThis", "a", AggCustom)
     assert(arrOfA("a").doubleRdd.first === df("a").doubleRdd.sum)
+
+    val countOfA = df.aggregate("groupByThis", "a", AggCountDouble)
+    assert(countOfA("a").doubleRdd.first() === 3)
   }
 
   test("Aggregate multi") {
