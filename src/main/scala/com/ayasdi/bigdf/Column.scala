@@ -6,7 +6,10 @@
  */
 package com.ayasdi.bigdf
 
-import scala.collection.mutable.HashMap
+import java.util.{HashMap => JHashMap}
+
+import scala.collection.JavaConversions.mapAsScalaMap
+import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 
@@ -21,6 +24,7 @@ import org.apache.spark.storage.StorageLevel
   To get this warning pattern matching is necessary, ABSOLUTELY NO if/else for column type
  */
 object ColType {
+
   sealed trait EnumVal
 
   case object Double extends EnumVal
@@ -38,6 +42,7 @@ object ColType {
   case object MapOfStringToFloat extends EnumVal
 
   case object Undefined extends EnumVal
+
 }
 
 /**
@@ -59,8 +64,8 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * set names for categories
    * FIXME: this should be somewhere else not in Column[T]
    */
-  val catNameToNum = new HashMap[String, Short]
-  val catNumToName = new HashMap[Short, String]
+  val catNameToNum: mutable.Map[String, Short] = new JHashMap[String, Short]
+  val catNumToName: mutable.Map[Short, String] = new JHashMap[Short, String]
 
   /**
    * count number of elements. although rdd is var not val the number of elements does not change
@@ -78,32 +83,32 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   private[bigdf] val isShort = tpe =:= ru.typeOf[Short]
   private[bigdf] val isArrayOfString = tpe =:= ru.typeOf[Array[String]]
   private[bigdf] val isArrayOfDouble = tpe =:= ru.typeOf[Array[Double]]
-  private[bigdf] val isMapOfStringToFloat = tpe =:= ru.typeOf[Map[String, Float]]
+  private[bigdf] val isMapOfStringToFloat = tpe =:= ru.typeOf[mutable.Map[String, Float]]
 
   /*
       use this for demux'ing in column type
       always use pattern matching, never if/else
    */
-  val colType: ColType.EnumVal = if(isDouble) ColType.Double
-      else if(isFloat) ColType.Float
-      else if(isShort) ColType.Short
-      else if(isString) ColType.String
-      else if(isArrayOfString) ColType.ArrayOfString
-      else if(isMapOfStringToFloat) ColType.MapOfStringToFloat
-      else if(isArrayOfDouble) ColType.ArrayOfDouble
-      else ColType.Undefined
+  val colType: ColType.EnumVal = if (isDouble) ColType.Double
+  else if (isFloat) ColType.Float
+  else if (isShort) ColType.Short
+  else if (isString) ColType.String
+  else if (isArrayOfString) ColType.ArrayOfString
+  else if (isMapOfStringToFloat) ColType.MapOfStringToFloat
+  else if (isArrayOfDouble) ColType.ArrayOfDouble
+  else ColType.Undefined
 
-  val sqlType: DataType = if(isDouble) DoubleType
-      else if(isFloat) FloatType
-      else if(isShort) ShortType
-      else if(isString) StringType
-      else if(isArrayOfString) ArrayType(StringType)
-      else if(isMapOfStringToFloat) MapType(StringType, FloatType)
-      else if(isArrayOfDouble) ArrayType(DoubleType)
-      else {
-        throw new Exception("Unknown column type")
-        null
-      }
+  val sqlType: DataType = if (isDouble) DoubleType
+  else if (isFloat) FloatType
+  else if (isShort) ShortType
+  else if (isString) StringType
+  else if (isArrayOfString) ArrayType(StringType)
+  else if (isMapOfStringToFloat) MapType(StringType, FloatType)
+  else if (isArrayOfDouble) ArrayType(DoubleType)
+  else {
+    throw new Exception("Unknown column type")
+    null
+  }
 
   lazy val csvWritable = isDouble || isFloat || isShort || isString
 
@@ -120,7 +125,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
     else if (isArrayOfString) classTag[C] == classTag[Array[String]]
     else if (isArrayOfDouble) classTag[C] == classTag[Array[Double]]
     else if (isFloat) classTag[C] == classTag[Float]
-    else if (isMapOfStringToFloat) classTag[C] == classTag[Map[String, Float]]
+    else if (isMapOfStringToFloat) classTag[C] == classTag[mutable.Map[String, Float]]
     else false
   }
 
@@ -139,7 +144,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
     this.asInstanceOf[Column[Float]]
   }
 
-  def castShort= {
+  def castShort = {
     require(isShort)
     this.asInstanceOf[Column[Short]]
   }
@@ -151,7 +156,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
 
   def castMapStringToFloat = {
     require(isMapOfStringToFloat)
-    this.asInstanceOf[Column[Map[String, Float]]]
+    this.asInstanceOf[Column[mutable.Map[String, Float]]]
   }
 
   override def toString = {
@@ -165,7 +170,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
     import com.ayasdi.bigdf.Implicits._
     val c = if (rdd != null) count else 0
     println(s"\ttype:${colType}\n\tcount:${c}\n\tparseErrors:${parseErrors}")
-    if(isDouble) castDouble.printStats
+    if (isDouble) castDouble.printStats
   }
 
   /**
@@ -173,10 +178,12 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    */
   def head(max: Int): Array[String] = {
     colType match {
-      case ColType.Double | ColType.Float  => doubleRdd.take(max).map { d => f"$d%8.4f" }
-      case ColType.String => stringRdd.take(max).map { s => f"$s%20s"}
-//FIXME:      case ColType.Short => shortRdd.take(max).map { s => f"$s%3d"}
-      case _ => rdd.take(max).map { _.toString }
+      case ColType.Double | ColType.Float => doubleRdd.take(max).map { d => f"$d%8.4f" }
+      case ColType.String => stringRdd.take(max).map { s => f"$s%20s" }
+      //FIXME:      case ColType.Short => shortRdd.take(max).map { s => f"$s%3d"}
+      case _ => rdd.take(max).map {
+        _.toString
+      }
     }
   }
 
@@ -184,11 +191,6 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * make a clone of this column, the clone does not belong to any DF  and has no name
    */
   def makeCopy = Column[T](sc, rdd.asInstanceOf[RDD[T]])
-
-//  def name_=(n: String): Unit = {
-//    require(df.isEmpty)
-//    name = n
-//  }
 
   /**
    * print upto max(default 10) elements
@@ -211,11 +213,10 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    */
   def countNA = {
     colType match {
-      case ColType.Double => doubleRdd.filter { _.isNaN }.count
-      case ColType.Float => floatRdd.filter { _.isNaN }.count
-      case ColType.Short => shortRdd.filter {  _ == RichColumnCategory.CATEGORY_NA }
-        .count //short is used for categories
-      case ColType.String => stringRdd.filter { _.isEmpty }.count
+      case ColType.Double => doubleRdd.filter(_.isNaN).count
+      case ColType.Float => floatRdd.filter(_.isNaN).count
+      case ColType.Short => shortRdd.filter(_ == RichColumnCategory.CATEGORY_NA).count //short is used for categories
+      case ColType.String => stringRdd.filter(_.isEmpty).count
       case _ => {
         throw new RuntimeException(s"ERROR: No NA defined for column type ${colType}")
       }
@@ -255,7 +256,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * get rdd of map from string to float for things like tfidf values of terms
    */
-  def mapOfStringToFloatRdd = getRdd[Map[String, Float]]
+  def mapOfStringToFloatRdd = getRdd[mutable.Map[String, Float]]
 
   /**
    * get the RDD typecast to the given type
@@ -263,8 +264,8 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * @return RDD of R's. throws exception if the cast is not applicable to this column
    */
   def getRdd[R: ru.TypeTag] = {
-     require(ru.typeOf[R] =:= ru.typeOf[T], s"s${ru.typeOf[R]} does not match s${ru.typeOf[T]}")
-     rdd.asInstanceOf[RDD[R]]
+    require(ru.typeOf[R] =:= ru.typeOf[T], s"s${ru.typeOf[R]} does not match s${ru.typeOf[T]}")
+    rdd.asInstanceOf[RDD[R]]
   }
 
   /**
@@ -468,7 +469,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
 
   def dbl_map[U: ClassTag](mapper: Double => U) = {
     val mapped = if (isDouble) {
-      doubleRdd.map { row => mapper(row)}
+      doubleRdd.map { row => mapper(row) }
     }
     if (classTag[U] == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
@@ -478,7 +479,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
 
   def str_map[U: ClassTag](mapper: String => U) = {
     val mapped = if (isString) {
-      stringRdd.map { row => mapper(row)}
+      stringRdd.map { row => mapper(row) }
     }
     if (classTag[U] == classTag[Double])
       Column(sc, mapped.asInstanceOf[RDD[Double]])
@@ -543,7 +544,7 @@ object Column {
 
     val shortRdd = doubleRdd.map { x =>
       val y = x.toShort
-      if(y != x || x.isNaN) parseErrors += 1
+      if (y != x || x.isNaN) parseErrors += 1
       y
     }
 

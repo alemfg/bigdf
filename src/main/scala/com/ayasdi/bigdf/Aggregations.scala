@@ -6,8 +6,11 @@
 
 package com.ayasdi.bigdf
 
+import java.util.{HashMap => JHashMap}
+
+import scala.collection.JavaConversions.mapAsScalaMap
+import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
-import scala.collection.mutable.HashMap
 
 /**
  * Extend this class to do aggregations. Implement aggregate method.
@@ -55,11 +58,12 @@ class AggCount[V] extends Aggregator[V, Long, Double] {
       add running counts
    */
   def aggregate(a: Long, b: Long) = (a + b)
-  
+
   override def finalize(x: Long): Double = x
 }
 
 case object AggCountDouble extends AggCount[Double]
+
 case object AggCountString extends AggCount[String]
 
 case object AggMean extends Aggregator[Double, Tuple2[Double, Long], Double] {
@@ -88,24 +92,32 @@ case object AggSum extends Aggregator[Double, Double, Double] {
 
 class AggString[W] extends Aggregator[String, Array[String], W] {
   override def convert(a: String) = Array(a.asInstanceOf[String])
+
   def aggregate(a: Array[String], b: Array[String]) = a ++ b
 }
 
 case object AggArrayString extends AggString[Array[String]]
 
-class AggCountString[W] extends Aggregator[String, HashMap[String, Float], W] {
-  override def convert(a: String) = HashMap(a -> 1.0F)
-  override def mergeValue(agg: HashMap[String, Float], a: String) = {
+class AggCountString[W] extends Aggregator[String, mutable.Map[String, Float], W] {
+  override def convert(a: String) = {
+    val jmap = new JHashMap[String, Float]
+    jmap(a) = 1.0F
+    jmap
+  }
+
+  override def mergeValue(agg: mutable.Map[String, Float], a: String) = {
     agg(a) = agg.getOrElse(a, 0.0F) + 1
     agg
   }
-  override def mergeCombiners(a: HashMap[String, Float], b: HashMap[String, Float]) = {
+
+  override def mergeCombiners(a: mutable.Map[String, Float], b: mutable.Map[String, Float]) = {
     b.foreach { case (term, count) =>
       a(term) = a.getOrElse(term, 0.0F) + 1
     }
     a
   }
-  def aggregate(a: HashMap[String, Float], b: HashMap[String, Float]) = mergeCombiners(a, b)
+
+  def aggregate(a: mutable.Map[String, Float], b: mutable.Map[String, Float]) = mergeCombiners(a, b)
 }
 
 case class AggMakeString(val sep: String = ",") extends AggString[String] {
