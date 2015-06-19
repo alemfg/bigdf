@@ -12,6 +12,8 @@ import scala.collection.JavaConversions.mapAsScalaMap
 import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 
+import org.apache.spark.util.StatCounter
+
 /**
  * Extend this class to do aggregations. Implement aggregate method.
  * Optionally override convert and finalize
@@ -65,6 +67,20 @@ class AggCount[V] extends Aggregator[V, Long, Double] {
 case object AggCountDouble extends AggCount[Double]
 
 case object AggCountString extends AggCount[String]
+
+case object AggStats extends Aggregator[Double, StatCounter, mutable.Map[String, Float]] {
+  override def convert(cell: Double) = StatCounter(cell)
+  def aggregate(a: StatCounter, b: StatCounter) = a.merge(b)
+  override def finalize(x: StatCounter) = {
+    val stats = new JHashMap[String, Float]()
+    stats("Mean") = x.mean.toFloat
+    stats("Max") = x.max.toFloat
+    stats("Min") = x.min.toFloat
+    stats("Variance") = x.variance.toFloat
+
+    stats
+  }
+}
 
 case object AggMean extends Aggregator[Double, Tuple2[Double, Long], Double] {
   type SumNCount = Tuple2[Double, Long]

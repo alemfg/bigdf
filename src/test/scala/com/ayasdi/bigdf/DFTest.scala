@@ -433,6 +433,14 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     val countOfA = df.aggregate("groupByThis", "a", AggCountDouble)
     assert(countOfA("a").doubleRdd.first() === 3)
+
+    val statsOfA = df.aggregate("groupByThis", "a", AggStats)
+    statsOfA.list()
+    val stats = statsOfA("a").mapOfStringToFloatRdd.first()
+    assert(math.abs(stats("Mean") - 12.0) < 0.1)
+    assert(stats("Max") === 13.0)
+    assert(stats("Min") === 11.0)
+    assert(math.abs(stats("Variance") - 0.6666667) < 0.1)
   }
 
   test("Aggregate multi") {

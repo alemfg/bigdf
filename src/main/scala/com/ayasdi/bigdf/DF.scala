@@ -6,6 +6,7 @@
 package com.ayasdi.bigdf
 
 import scala.collection.immutable.Range.Inclusive
+import scala.collection.mutable
 import scala.collection.mutable.HashMap
 import scala.language.dynamics
 import scala.reflect.ClassTag
@@ -28,8 +29,11 @@ object JoinType extends Enumeration {
 }
 
 /**
- * Data Frame is a map of column names to RDD(s) containing those columns.
- * Constructor is private, instances are created by factory calls(apply) in
+ * A DataFrame is a "list of vectors of equal length". It is a 2-dimensional tabular
+ * data structure organized as rows and columns.
+ *
+ * Internally, bigdf's DF is a map of column names to RDD(s) containing those columns.
+ * Constructor is private, instances are created by factory calls(apply) in the
  * companion object.
  * Number of rows cannot change. Columns can be added, removed, modified.
  * The following types of columns are supported:
@@ -56,7 +60,12 @@ case class DF private(val sc: SparkContext,
 
   lazy val rowIndexRdd = column(0).rdd.zipWithIndex().map(_._2.toDouble)
 
-  def rowIndexCol = {
+  /**
+   * creates(if not already present) a column with name rowIndexCol that contains a series from zero
+   * until rowCount
+   * @return column of row indices
+   */
+  lazy val rowIndexCol = {
     val col = Column[Double](sc, rowIndexRdd, -1, "rowIndexCol")
     setColumn("rowIndexCol", col)
     col
@@ -75,7 +84,7 @@ case class DF private(val sc: SparkContext,
   private val filterWithRowStrategy = options.perfTuningOpts.filterWithRowStrategy
 
   /**
-   * rdd caching storage level
+   * rdd caching storage level. see spark's rdd.cache() for details.
    */
   private val storageLevel: StorageLevel = options.perfTuningOpts.storageLevel
 
@@ -89,24 +98,42 @@ case class DF private(val sc: SparkContext,
     rowsRddCached.get
   }
 
+  /**
+   * column names in order from first to last numerical index
+   * @return array of column names
+   */
   def columnNames = {
     (0 until columnCount).map { colIndex => indexToColumnName(colIndex) }.toArray
   }
 
+  /**
+   * sequence of columns with given indices
+   * @param indices sequence of numeric column indices, by default all columns
+   * @return sequence of Columns
+   */
   def columns(indices: Seq[Int] = 0 until columnCount) = {
     indices.map { colIndex => column(indexToColumnName(colIndex)) }
   }
 
+  /**
+   * schema of this df
+   * @return array of tuples. each tuple is a name and type.
+   */
   def schema = {
     columnNames.map { name => (name, column(name).colType) }
   }
 
+  /**
+   * some metadata for this df
+   * @return
+   */
   override def toString() = {
     s"Name: $name, #Columns: $columnCount, Options: $options"
   }
 
   /**
    * convert the DF to an RDD of CSV Strings. columns with compound types like Map, Array are skipped
+   * because they cannot be represented in CSV format
    * @param separator use this separator, default is comma
    * @param cols sequence of column names to include in output
    */
@@ -138,7 +165,7 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * save the DF to a parquet file, skip compound columns like map and array
+   * save the DF to a parquet file. skips compound columns like map and array, these will be supported later.
    * @param file save DF in this file
    */
   def writeToParquet(file: String,
@@ -178,6 +205,11 @@ case class DF private(val sc: SparkContext,
     else null
   }
 
+  /**
+   * add/replace a column in this df
+   * @param colName name of column, will be overwritten if it exists
+   * @param that column to add to this df
+   */
   def setColumn(colName: String, that: Column[Any]) = {
     require(that.df.isEmpty && that.index == -1)
 
@@ -198,6 +230,11 @@ case class DF private(val sc: SparkContext,
     //FIXME: incremental computation of rows
   }
 
+  /**
+   * add/replace a column in this df
+   * @param colIndex index of column, will be overwritten if it exists
+   * @param that column to add to this df
+   */
   //FIXME: unit test
   def setColumn(colIndex: Int, that: Column[Any]) = {
     require(that.df.isEmpty && that.index == -1 && colIndex < columnCount && column(that.name) == null)
@@ -259,6 +296,11 @@ case class DF private(val sc: SparkContext,
     }
   }
 
+  /**
+   * slice the df to get a contiguous subset of rows
+   * @param indexRange row index range
+   * @return a new df
+   */
   def rowsByRange(indexRange: Range): DF = {
     val pred = (rowIndexCol >= indexRange.start.toDouble) &&
       (rowIndexCol <= indexRange.end.toDouble)
@@ -267,7 +309,9 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * make a filtered DF
+   * filter using given RDD of Booleans
+   * @param filtration RDD of Booleans. True retains corresponding row in the output
+   * @return a new df
    */
   def filter(filtration: RDD[Boolean]) = {
     val cols = nameToColumn.clone
@@ -376,11 +420,13 @@ case class DF private(val sc: SparkContext,
   }
 
   /**
-   * rename columns, modify same DF or make a new one
+   * rename columns
+   * @param columns a map of old name to new name
+   * @param inPlace true to modify this df, false to create a new one
    */
   def rename(columns: Map[String, String], inPlace: Boolean = true) = {
     val df = if (inPlace == false) new DF(sc, nameToColumn.clone, indexToColumnName.clone,
-      name = name, options = options)
+      name = name, options = options)  //FIXME: clone the columns too
     else this
 
     columns.foreach {
@@ -561,18 +607,23 @@ case class DF private(val sc: SparkContext,
         aggtor.finalize(v)
       }(SparkUtil.typeTagToClassTag[W]).asInstanceOf[RDD[Double]]
       Column(sc, col1)
-    } else if (wtpe.tpe == ru.typeOf[String]) {
+    } else if (wtpe.tpe =:= ru.typeOf[String]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }(SparkUtil.typeTagToClassTag[W]).asInstanceOf[RDD[String]]
       Column(sc, col1)
-    } else if (wtpe.tpe == ru.typeOf[Array[String]]) {
+    } else if (wtpe.tpe =:= ru.typeOf[Array[String]]) {
       val col1 = aggedRdd.map { case (k, v) =>
         aggtor.finalize(v)
       }(SparkUtil.typeTagToClassTag[W]).asInstanceOf[RDD[Array[String]]]
       Column(sc, col1)
+    } else if (wtpe.tpe =:= ru.typeOf[mutable.Map[String, Float]]) {
+      val col1 = aggedRdd.map { case (k, v) =>
+        aggtor.finalize(v)
+      }(SparkUtil.typeTagToClassTag[W]).asInstanceOf[RDD[mutable.Map[String, Float]] ]
+      Column(sc, col1)
     } else {
-      throw new RuntimeException(s"ERROR: aggregate value type $wtpe")
+      throw new IllegalArgumentException(s"ERROR: aggregated result of type $wtpe is not supported")
     }
 
     aggdColumnInResult.name = aggdCol
