@@ -39,8 +39,12 @@ case class PyDF(df: DF) {
 
   def colCount = df.columnCount
 
-  def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType) = {
-    DF.join(sc, left, right, on, how)
+  def join(sc: SparkContext, left: PyDF, right: PyDF, on: String, how: String) = {
+    val joinType = how match {
+      case "inner" => JoinType.Inner
+      case "outer" => JoinType.Outer
+    }
+    PyDF(DF.join(sc, left.df, right.df, on, joinType))
   }
 
   def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String): PyDF = {
@@ -48,6 +52,7 @@ case class PyDF(df: DF) {
     val aggrColumn = aggrColumnJ.asScala.toList
     val dfAgg = aggregator match {
       case "Mean" => df.aggregate(byColumn, aggrColumn, AggMean)
+      case "Sum" => df.aggregate(byColumn, aggrColumn, AggSum)        
       case "Count" => {
         df(aggrColumn.head).colType match {
           case ColType.Double => df.aggregate(byColumn, aggrColumn, AggCountDouble)
