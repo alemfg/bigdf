@@ -42,7 +42,7 @@ case class PyDF(df: DF) {
   def join(sc: SparkContext, left: PyDF, right: PyDF, on: String, how: String) = {
     val joinType = how match {
       case "inner" => JoinType.Inner
-      case "outer" => JoinType.Outer
+      case _ => throw new IllegalArgumentException(s"$how join not supported")
     }
     PyDF(DF.join(sc, left.df, right.df, on, joinType))
   }
@@ -110,7 +110,7 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
 
   def setName(name: String): Unit = { col.name = name }
   def name = col.name
-  
+  def makeCopy = col.makeCopy
   def tpe = s"${col.colType}"
 
   def stats = {
