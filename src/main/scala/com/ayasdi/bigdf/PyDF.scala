@@ -110,7 +110,7 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
 
   def setName(name: String): Unit = { col.name = name }
   def name = col.name
-  def makeCopy = col.makeCopy
+  def makeCopy = PyColumn(col.makeCopy)
   def tpe = s"${col.colType}"
 
   def stats = {
