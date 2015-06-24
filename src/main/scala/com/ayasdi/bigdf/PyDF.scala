@@ -137,11 +137,13 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
     case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
     case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
     case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
+    case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
     case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
     case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
   }
 
   def pythonToJava[T: ClassTag](c: JavaRDD[Array[Byte]]): PyColumn[Any] = {
+    //FIXME: other types
     val jrdd: JavaRDD[T] = BigDFPyRDD.javaRDD(c)
     val tpe = classTag[T]
     if (tpe == classTag[Double]) PyColumn[Double](Column(col.sc, jrdd.rdd.asInstanceOf[RDD[Double]], -1))
@@ -173,6 +175,7 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
 
 object PyColumn {
   def fromRDD[T: ClassTag](rdd: RDD[T]) = {
+    //FIXME: other types
     val tpe = classTag[T]
     if (tpe == classTag[Double]) PyColumn(Column(rdd.sparkContext, rdd.asInstanceOf[RDD[Double]], -1))
     else if (tpe == classTag[String]) PyColumn(Column(rdd.sparkContext, rdd.asInstanceOf[RDD[String]], -1))

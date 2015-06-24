@@ -29,7 +29,7 @@ object JoinType extends Enumeration {
 }
 
 /**
- * A DataFrame is a "list of vectors of equal length". It is a 2-dimensional tabular
+ * A DF is a "list of vectors of equal length". It is a 2-dimensional tabular
  * data structure organized as rows and columns.
  *
  * Internally, bigdf's DF is a map of column names to RDD(s) containing those columns.
@@ -178,8 +178,8 @@ case class DF private(val sc: SparkContext,
     val rowRdd = ColumnZipper.zipAndMap(writeColNames.map(column(_))) {
       Row.fromSeq(_)
     }
-    val rowsSchemaRdd = new SQLContext(sc).applySchema(rowRdd, StructType(fields))
-    rowsSchemaRdd.saveAsParquetFile(file)
+    val rowsSchemaRdd = new SQLContext(sc).createDataFrame(rowRdd, StructType(fields))
+    rowsSchemaRdd.write.parquet(file)
   }
 
   /**
@@ -326,6 +326,7 @@ case class DF private(val sc: SparkContext,
         case ColType.Double => cols(colName) = Column(sc, applyFilter(col.doubleRdd), i)
         case ColType.Float => cols(colName) = Column(sc, applyFilter(col.floatRdd), i)
         case ColType.Short => cols(colName) = Column(sc, applyFilter(col.shortRdd), i)
+        case ColType.Long => cols(colName) = Column(sc, applyFilter(col.longRdd), i)
         case ColType.String => cols(colName) = Column(sc, applyFilter(col.stringRdd), i)
         case ColType.ArrayOfString => cols(colName) = Column(sc, applyFilter(col.arrayOfStringRdd), i)
         case ColType.ArrayOfDouble => cols(colName) = Column(sc, applyFilter(col.arrayOfDoubleRdd), i)
@@ -390,6 +391,12 @@ case class DF private(val sc: SparkContext,
           val colRdd = rows.map { row => row(i).asInstanceOf[Short] }
           Column(sc, colRdd, -1, colName)
         }
+
+        case ColType.Long => {
+          val colRdd = rows.map { row => row(i).asInstanceOf[Long] }
+          Column(sc, colRdd, -1, colName)
+        }
+
 
         case ColType.String => {
           val colRdd = rows.map { row => row(i).asInstanceOf[String] }
@@ -564,6 +571,12 @@ case class DF private(val sc: SparkContext,
         case ColType.Short => {
           val col1 = aggedRdd.map { case (k, v) =>
             k(j).asInstanceOf[Short]
+          }.cache()
+          Column(sc, col1)
+        }
+        case ColType.Long => {
+          val col1 = aggedRdd.map { case (k, v) =>
+            k(j).asInstanceOf[Long]
           }.cache()
           Column(sc, col1)
         }
@@ -989,7 +1002,7 @@ object DF {
   def fromParquet(sc: SparkContext,
                   inFile: String,
                   options: Options = Options()): DF = {
-    val sparkDF = new SQLContext(sc).parquetFile(inFile)
+    val sparkDF = new SQLContext(sc).read.parquet(inFile)
     require(sparkDF.schema.fields.forall { field =>
         field.dataType == DoubleType ||
         field.dataType == FloatType ||
@@ -1006,6 +1019,10 @@ object DF {
           rdd.setName(s"$inFile/parquet-double/${field.name}")
           Column(sc, rdd, -1, field.name)
         case ColType.String =>
+          val rdd = sparkDF.rdd.map { row => row(i).asInstanceOf[String] }
+          rdd.setName(s"$inFile/parquet-string/${field.name}")
+          Column(sc, rdd, -1, field.name)
+        case ColType.Long =>
           val rdd = sparkDF.rdd.map { row => row(i).asInstanceOf[String] }
           rdd.setName(s"$inFile/parquet-string/${field.name}")
           Column(sc, rdd, -1, field.name)
@@ -1105,6 +1122,10 @@ object DF {
             val colRdd = joinedRows.map { row => partGetter(row)(origIndex).asInstanceOf[Short] }
             Column(curDf.sc, colRdd, joinedIndex)
           }
+          case ColType.Long => {
+            val colRdd = joinedRows.map { row => partGetter(row)(origIndex).asInstanceOf[Long] }
+            Column(curDf.sc, colRdd, joinedIndex)
+          }
           case ColType.MapOfStringToFloat => {
             val colRdd = joinedRows.map { row => partGetter(row)(origIndex).asInstanceOf[Map[String, Float]] }
             Column(curDf.sc, colRdd, joinedIndex)
@@ -1198,6 +1219,10 @@ object DF {
         }
         case ColType.Short => {
           val cols = dfs.map { df => df.column(i).shortRdd }
+          Column(sc, unionRdd(cols), i)
+        }
+        case ColType.Long => {
+          val cols = dfs.map { df => df.column(i).longRdd }
           Column(sc, unionRdd(cols), i)
         }
         case ColType.MapOfStringToFloat => {

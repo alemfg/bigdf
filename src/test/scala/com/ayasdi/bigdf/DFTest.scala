@@ -350,6 +350,17 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df.countRowsWithNA === 2)
   }
 
+  test("Column Ops: New column as custom map of existing one") {
+    val df = makeDF
+
+    df("aPlus1") = df("a").map[Double, Double](x => x + 1.0)
+    assert(df("aPlus1").doubleRdd.collect === Array(12.0, 13.0, 14.0))
+
+    df("aStr") = df("a").map[Double, String]{ x: Double => x.toString }
+    assert(df("aStr").stringRdd.collect === Array("11.0", "12.0", "13.0"))
+  }
+
+
   test("Column Ops: New column as simple function of existing ones") {
     val df = makeDF
     val aa = df("a").doubleRdd.first

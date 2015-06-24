@@ -33,6 +33,8 @@ object ColType {
 
   case object Short extends EnumVal
 
+  case object Long extends EnumVal
+
   case object String extends EnumVal
 
   case object ArrayOfString extends EnumVal
@@ -81,6 +83,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   private[bigdf] val isFloat = tpe =:= ru.typeOf[Float]
   private[bigdf] val isString = tpe =:= ru.typeOf[String]
   private[bigdf] val isShort = tpe =:= ru.typeOf[Short]
+  private[bigdf] val isLong = tpe =:= ru.typeOf[Long]
   private[bigdf] val isArrayOfString = tpe =:= ru.typeOf[Array[String]]
   private[bigdf] val isArrayOfDouble = tpe =:= ru.typeOf[Array[Double]]
   private[bigdf] val isMapOfStringToFloat = tpe =:= ru.typeOf[mutable.Map[String, Float]]
@@ -92,6 +95,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   val colType: ColType.EnumVal = if (isDouble) ColType.Double
   else if (isFloat) ColType.Float
   else if (isShort) ColType.Short
+  else if(isLong) ColType.Long
   else if (isString) ColType.String
   else if (isArrayOfString) ColType.ArrayOfString
   else if (isMapOfStringToFloat) ColType.MapOfStringToFloat
@@ -101,6 +105,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   val sqlType: DataType = if (isDouble) DoubleType
   else if (isFloat) FloatType
   else if (isShort) ShortType
+  else if (isLong) LongType
   else if (isString) StringType
   else if (isArrayOfString) ArrayType(StringType)
   else if (isMapOfStringToFloat) MapType(StringType, FloatType)
@@ -122,6 +127,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
     else if (isFloat) classTag[C] == classTag[Double]
     else if (isString) classTag[C] == classTag[String]
     else if (isShort) classTag[C] == classTag[Short]
+    else if (isLong) classTag[C] == classTag[Long]
     else if (isArrayOfString) classTag[C] == classTag[Array[String]]
     else if (isArrayOfDouble) classTag[C] == classTag[Array[Double]]
     else if (isFloat) classTag[C] == classTag[Float]
@@ -147,6 +153,11 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   def castShort = {
     require(isShort)
     this.asInstanceOf[Column[Short]]
+  }
+
+  def castLong= {
+    require(isShort)
+    this.asInstanceOf[Column[Long]]
   }
 
   def castArrayOfString = {
@@ -215,6 +226,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
     colType match {
       case ColType.Double => doubleRdd.filter(_.isNaN).count
       case ColType.Float => floatRdd.filter(_.isNaN).count
+      case ColType.Long => 0L //Long cannot be NaN ?
       case ColType.Short => shortRdd.filter(_ == RichColumnCategory.CATEGORY_NA).count //short is used for categories
       case ColType.String => stringRdd.filter(_.isEmpty).count
       case _ => {
@@ -242,6 +254,11 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * get rdd of shorts
    */
   def shortRdd = getRdd[Short]
+
+  /**
+   * get rdd of shorts
+   */
+  def longRdd = getRdd[Long]
 
   /**
    * get rdd of array of strings to do text analysis
@@ -453,18 +470,12 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * apply a given function to a column to generate a new column
    * the new column does not belong to any DF automatically
-   * FIXME: other column types
    */
-  def map[U: ClassTag](mapper: Any => U) = {
-    val mapped = if (isDouble) {
-      doubleRdd.map { row => mapper(row) }
-    } else {
-      stringRdd.map { row => mapper(row) }
-    }
-    if (classTag[U] == classTag[Double])
-      Column(sc, mapped.asInstanceOf[RDD[Double]])
-    else
-      Column(sc, mapped.asInstanceOf[RDD[String]])
+  def map[U: ru.TypeTag, V: ru.TypeTag](mapper: U => V) = {
+    require(ru.typeOf[U] =:= tpe)
+    implicit val vTpe = SparkUtil.typeTagToClassTag(ru.typeTag[V])
+    val mapped = getRdd[U].map { row => mapper(row) }
+    Column[V](sc, mapped.asInstanceOf[RDD[V]])
   }
 
   def dbl_map[U: ClassTag](mapper: Double => U) = {
