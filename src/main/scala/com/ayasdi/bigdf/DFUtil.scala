@@ -115,25 +115,26 @@ object SparkUtil {
 
   def sqlToColType(sqlType: DataType): ColType.EnumVal = sqlType match {
     case DoubleType => ColType.Double
-    case FloatType => ColType.Double
-    case ShortType => ColType.Double //FIXME: categoricals
-    // FIXME: support following
-    //    case StringType => ColType.String
-    //    case ArrayType(DoubleType, _) => ColType.ArrayOfDouble
-    //    case ArrayType(StringType, _) => ColType.ArrayOfString
-    //    case MapType(StringType, FloatType, _) => ColType.MapOfStringToFloat
-    case _ => throw new Exception("Unsupported type")
+    case FloatType => ColType.Float
+    case ShortType => ColType.Short
+    case LongType => ColType.Long
+    case StringType | BinaryType => ColType.String
+    case ArrayType(DoubleType, _) => ColType.ArrayOfDouble
+    case ArrayType(StringType, _) => ColType.ArrayOfString
+    case MapType(StringType, FloatType, _) => ColType.MapOfStringToFloat
+    case _ => throw new Exception(s"Unsupported type: $sqlType")
   }
 
   def colTypeToSql(colType: ColType.EnumVal): DataType = colType match {
     case ColType.Double => DoubleType
     case ColType.Float => FloatType
     case ColType.Short => ShortType
+    case ColType.Long => LongType
     case ColType.String => StringType
     case ColType.ArrayOfDouble => ArrayType(DoubleType)
     case ColType.ArrayOfString => ArrayType(StringType)
     case ColType.MapOfStringToFloat => MapType(StringType, FloatType)
-    case _ => throw new Exception("Unsupported type")
+    case _ => throw new Exception(s"Unsupported type: $colType")
   }
 
   def typeTagToClassTag[V: ru.TypeTag] = {

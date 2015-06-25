@@ -1002,14 +1002,18 @@ object DF {
   def fromParquet(sc: SparkContext,
                   inFile: String,
                   options: Options = Options()): DF = {
-    val sparkDF = new SQLContext(sc).read.parquet(inFile)
+    val sqlContext = new SQLContext(sc)
+    sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
+    val sparkDF = sqlContext.read.parquet(inFile)
     require(sparkDF.schema.fields.forall { field =>
         field.dataType == DoubleType ||
         field.dataType == FloatType ||
         field.dataType == StringType ||
+        field.dataType == BinaryType ||
         field.dataType == IntegerType ||
+        field.dataType == LongType ||
         field.dataType == ShortType
-    })
+    }, s"${sparkDF.schema.fields}")
 
     val cols = sparkDF.schema.fields.map { field =>
       val i = sparkDF.schema.fields.indexOf(field)
@@ -1023,10 +1027,10 @@ object DF {
           rdd.setName(s"$inFile/parquet-string/${field.name}")
           Column(sc, rdd, -1, field.name)
         case ColType.Long =>
-          val rdd = sparkDF.rdd.map { row => row(i).asInstanceOf[String] }
+          val rdd = sparkDF.rdd.map { row => row(i).asInstanceOf[Long] }
           rdd.setName(s"$inFile/parquet-string/${field.name}")
           Column(sc, rdd, -1, field.name)
-        case _ => throw new Exception("Unsupported type")
+        case _ => throw new Exception(s"Unsupported type: $field")
       }
     }
 

@@ -227,7 +227,7 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       case ColType.Double => doubleRdd.filter(_.isNaN).count
       case ColType.Float => floatRdd.filter(_.isNaN).count
       case ColType.Long => 0L //Long cannot be NaN ?
-      case ColType.Short => shortRdd.filter(_ == RichColumnCategory.CATEGORY_NA).count //short is used for categories
+      case ColType.Short => shortRdd.filter(_ == RichColumnCategory.CATEGORY_NA).count
       case ColType.String => stringRdd.filter(_.isEmpty).count
       case _ => {
         throw new RuntimeException(s"ERROR: No NA defined for column type ${colType}")
