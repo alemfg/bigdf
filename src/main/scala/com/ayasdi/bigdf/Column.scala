@@ -180,7 +180,7 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
       case ColType.Double => doubleRdd.filter(_.isNaN).count
       case ColType.Float => floatRdd.filter(_.isNaN).count
       case ColType.Long => 0L //Long cannot be NaN ?
-      case ColType.Short => shortRdd.filter(_ == RichColumnCategory.CATEGORY_NA).count
+      case ColType.Short => 0L //FIXME: use nullable attribute
       case ColType.String => stringRdd.filter(_.isEmpty).count
       case _ => {
         throw new RuntimeException(s"ERROR: No NA defined for column type ${colType}")
@@ -258,6 +258,26 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
    * multiply a column with another
    */
   def *(that: Column[_]) =  new Column(scol * that.scol)
+
+  /**
+   * add a number to a column
+   */
+  def +(that: Double) = new Column(scol + that)
+
+  /**
+   * subtract a number from a column
+   */
+  def -(that: Double) =  new Column(scol - that)
+
+  /**
+   * divide a column by a number
+   */
+  def /(that: Double) =  new Column(scol / that)
+
+  /**
+   * multiply a column with a number
+   */
+  def *(that: Double) =  new Column(scol * that)
 
   def ===(that: Column[_]) = scol === that.scol
 

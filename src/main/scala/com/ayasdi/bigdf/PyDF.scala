@@ -116,23 +116,6 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   def makeCopy = PyColumn(col.makeCopy)
   def tpe = s"${col.colType}"
 
-  def stats = {
-    col.colType match {
-      case ColType.Double | ColType.Float | ColType.Short =>
-        val rcol: RichColumnDouble = col
-        val stats = rcol.stats
-
-        mapAsJavaMap(Map("min" -> stats.min,
-          "max" -> stats.max,
-          "mean" -> stats.mean,
-          "std" -> stats.stdev,
-          "var" -> stats.variance,
-          "count" -> stats.count
-        ))
-      case _ => null
-    }
-  }
-
   def javaToPython: JavaRDD[Array[Byte]] = col.colType match {
     case ColType.Double => BigDFPyRDD.pythonRDD(col.doubleRdd)
     case ColType.String => BigDFPyRDD.pythonRDD(col.stringRdd)
@@ -155,23 +138,19 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   }
 
   def add(v: Double) = {
-    val rcol: RichColumnDouble = col
-    PyColumn(rcol + v)
+    PyColumn(col + v)
   }
 
   def sub(v: Double) = {
-    val rcol: RichColumnDouble = col
-    PyColumn(rcol - v)
+    PyColumn(col - v)
   }
 
   def mul(v: Double) = {
-    val rcol: RichColumnDouble = col
-    PyColumn(rcol * v)
+    PyColumn(col * v)
   }
 
   def div(v: Double) = {
-    val rcol: RichColumnDouble = col
-    PyColumn(rcol / v)
+    PyColumn(col / v)
   }
 
 }

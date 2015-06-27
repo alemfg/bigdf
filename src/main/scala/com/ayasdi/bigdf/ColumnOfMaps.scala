@@ -25,7 +25,7 @@ class RichColumnMaps[K, V](self: Column[mutable.Map[K, V]]) {
       }
       newColRdd.name = s"expanded_${k}"
       newColRdd.cache()
-      val newCol = Column(self.sc, newColRdd)
+      val newCol = Column(newColRdd)
       df.setColumn(s"${namePrefix}${k}", newCol)
     }
   }

@@ -7,21 +7,13 @@ package com.ayasdi.bigdf
 
 import scala.reflect.runtime.{universe => ru}
 import scala.language.dynamics
+import org.apache.spark.sql.{Column => SColumn}
 
 /**
  * Import these implicit conversions to access the Scala DSL
  */
 object Implicits {
   import scala.language.implicitConversions
-
-  implicit def columnDoubleToRichColumnDouble(col: Column[Double]) = new RichColumnDouble(col)
-  implicit def columnAnyToRichColumnDouble(col: Column[Any]) = new RichColumnDouble(col.castDouble)
-
-  implicit def columnStringToRichColumnString(col: Column[String]) = new RichColumnString(col)
-  implicit def columnAnyToRichColumnString(col: Column[Any]) = new RichColumnString(col.castString)
-
-  implicit def columnShortToRichColumnCategory(col: Column[Short]) = new RichColumnCategory(col.castShort)
-  implicit def columnAnyToRichColumnCategory(col: Column[Any]) = new RichColumnCategory(col.castShort)
 
   implicit def columnAnyToRichColumnMap(col: Column[Any]) = new RichColumnMaps(col.castMapStringToFloat)
 
@@ -67,7 +59,7 @@ case class RichDF(self: DF) extends Dynamic {
   /**
    * filter by a predicate
    */
-  def apply(cond: Predicate) = self.where(cond)
+  def apply(cond: SColumn) = self.where(cond)
 
   /**
    * update a column, add or replace

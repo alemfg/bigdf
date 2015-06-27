@@ -23,40 +23,6 @@ case class RichColumnSeq(val cols: Seq[Column[Any]]) {
     }
   }
 
-  /**
-   * apply a function to some columns to produce a new column
-   * @param mapper the function to be applied
-   * @tparam U  return type of the function
-   * @return  a new column
-   */
-  def slowMap[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
-    val tpe = classTag[U]
-    val zippedCols = ColumnZipper.makeRows(cols)
-    val mapped = zippedCols.map { row => mapper(row) }
-    if (tpe == classTag[Double])
-      Column(sc, mapped.asInstanceOf[RDD[Double]])
-    else if (tpe == classTag[String])
-      Column(sc, mapped.asInstanceOf[RDD[String]])
-    else
-      null
-  }
-
-  /**
-   * apply a function to some columns to produce a new column
-   * @param mapper the function to be applied
-   * @tparam U  return type of the function
-   * @return  a new column
-   */
-  def map[U: ClassTag](mapper: Array[Any] => U): Column[Any] = {
-    val tpe = classTag[U]
-    val mapped = ColumnZipper.zipAndMap(cols) { row => mapper(row) }
-    if (tpe == classTag[Double])
-      Column(sc, mapped.asInstanceOf[RDD[Double]])
-    else if (tpe == classTag[String])
-      Column(sc, mapped.asInstanceOf[RDD[String]])
-    else
-      null
-  }
 
   override def toString() = {
     cols.map { x =>

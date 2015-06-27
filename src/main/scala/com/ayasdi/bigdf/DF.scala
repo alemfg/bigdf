@@ -205,7 +205,7 @@ case class DF private(var sdf: DataFrame,
    * @param cond a predicate to filter on e.g. df("price") > 10
    */
   def where(cond: SColumn): DF = {
-    ???
+    new DF(sdf.filter(cond), options, s"filtered:$name")
   }
 
   /**
@@ -225,17 +225,20 @@ case class DF private(var sdf: DataFrame,
    * @param oldName2New a map of old name to new name
    * @param inPlace true to modify this df, false to create a new one
    */
-  def rename(oldName2New: Map[String, String], inPlace: Boolean = true) = {
+  def rename(oldName2New: Map[String, String], inPlace: Boolean = true): DF = {
     var newSdf = sdf
     oldName2New.foreach { case (k, v) =>
       newSdf = newSdf.withColumnRenamed(k, v)
     }
 
-    if (inPlace) {
+    val newDF = if (inPlace) {
       sdf = newSdf
+      this
+    } else {
+      new DF(newSdf, options, s"renamed:$name")
     }
 
-    sdf
+    newDF
   }
 
   /**

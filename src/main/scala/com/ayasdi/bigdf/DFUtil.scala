@@ -23,7 +23,6 @@ private[bigdf] object CountHelper {
       val a = col match {
         case x: Double => x.isNaN
         case x: String => x.isEmpty
-        case x: Short => x == RichColumnCategory.CATEGORY_NA //short is used for category
         case x: Float => x.isNaN
       }
       if (a == true) ret += 1
