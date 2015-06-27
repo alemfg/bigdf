@@ -12,6 +12,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.{Column => SColumn}
 
 /**
  * types of joins
@@ -127,22 +128,18 @@ case class DF private(var sdf: DataFrame,
   //    headerRdd.union(rows)
   //  }
   //
-  //  /**
-  //   * save the DF to a text file
-  //   * @param file save DF in this file
-  //   * @param separator use this separator, default is comma
-  //   * @param singlePart save to a single partition to allow easy transfer to non-HDFS storage
-  //   */
-  //  def writeToCSV(file: String,
-  //                 separator: String = ",",
-  //                 singlePart: Boolean = false,
-  //                 cols: Seq[String] = columnNames): Unit = {
-  //    if (singlePart) {
-  //      toCSV(separator, cols).coalesce(1).saveAsTextFile(file)
-  //    } else {
-  //      toCSV(separator, cols).saveAsTextFile(file)
-  //    }
-  //  }
+    /**
+     * save the DF to a text file
+     * @param file save DF in this file
+     * @param separator use this separator, default is comma
+     * @param singlePart save to a single partition to allow easy transfer to non-HDFS storage
+     */
+    def writeToCSV(file: String,
+                   separator: String = ",",
+                   singlePart: Boolean = false,
+                   cols: Seq[String] = columnNames): Unit = {
+      sdf.write.format("com.databricks.spark.csv").option("header", "true")
+    }
 
   /**
    * save the DF to a parquet file.
@@ -207,7 +204,7 @@ case class DF private(var sdf: DataFrame,
    * wrapper on filter to create a new DF from filtered RDD
    * @param cond a predicate to filter on e.g. df("price") > 10
    */
-  def where(cond: Predicate): DF = {
+  def where(cond: SColumn): DF = {
     ???
   }
 
@@ -284,16 +281,14 @@ case class DF private(var sdf: DataFrame,
   /**
    * aggregate multiple columns after grouping by multiple other columns
    * @param aggByCols sequence of columns to group by
-   * @param aggedCol sequence of columns to be aggregated
-   * @param aggtor implementation of Aggregator
-   * @tparam U
-   * @tparam V
+   * @param aggdCols map of columns to be aggregated and their aggregation functions
    * @return new DF with first column aggByCol and second aggedCol
    */
   def aggregate[U: ru.TypeTag, V: ru.TypeTag, W: ru.TypeTag](aggByCols: Seq[String],
-                                                             aggedCol: Seq[String],
-                                                             aggtor: Aggregator[U, V, W]) = {
-    //    aggregateWithColumnStrategy(aggByCols, aggedCol.head, aggtor)
+                                                             aggdCols: Map[String, String]) = {
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail:_*).agg(aggdCols)
+
+    new DF(aggdSdf, options, s"aggd:$name")
   }
 
   /**
@@ -455,6 +450,16 @@ object DF {
     val numPartitions = if (nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
     val dfs = files.map { file => fromCSVFile(sc, file, separator, numPartitions) }
     union(sc, dfs)
+  }
+
+  def fromColumns(sc: SparkContext, cols: Seq[Column[_]], name: String, options: Options): DF = {
+    val sqlContext = new SQLContext(sc)
+    var sdf = sqlContext.emptyDataFrame
+    cols.foreach { col =>
+      sdf = sdf.withColumn(col.name, col.scol)
+    }
+
+    new DF(sdf, options, name)
   }
 
   /**

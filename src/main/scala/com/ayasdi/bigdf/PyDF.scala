@@ -17,6 +17,7 @@ import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{BigDFPyRDD, SparkContext}
 import com.ayasdi.bigdf.Implicits._
+import org.apache.spark.sql.{Column => SColumn}
 
 case class PyDF(df: DF) {
   def columnNames = df.columnNames
@@ -28,7 +29,7 @@ case class PyDF(df: DF) {
   def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)
 
   def where(predicate: PyPredicate): PyDF = {
-    PyDF(df(predicate.p))
+    PyDF(df.where(predicate.p))
   }
 
   def update(name: String, pycol: PyColumn[_]) = {
@@ -50,17 +51,18 @@ case class PyDF(df: DF) {
   def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String): PyDF = {
     val byColumn = byColumnJ.asScala.toList
     val aggrColumn = aggrColumnJ.asScala.toList
+    val aggMap = Map(aggrColumn.head -> aggregator)
     val dfAgg = aggregator match {
-      case "Mean" => df.aggregate(byColumn, aggrColumn, AggMean)
-      case "Sum" => df.aggregate(byColumn, aggrColumn, AggSum)        
+      case "Mean" => df.aggregate(byColumn, aggMap)
+      case "Sum" => df.aggregate(byColumn, aggMap)
       case "Count" => {
         df(aggrColumn.head).colType match {
-          case ColType.Double => df.aggregate(byColumn, aggrColumn, AggCountDouble)
-          case ColType.String => df.aggregate(byColumn, aggrColumn, AggCountString)
+          case ColType.Double => df.aggregate(byColumn, aggMap)
+          case ColType.String => df.aggregate(byColumn, aggMap)
           case _ => throw new IllegalArgumentException("Count not yet supported for this column type")
         }
       }
-      case "StrJoin" => df.aggregate(byColumn, aggrColumn, new AggMakeString(","))
+      case "StrJoin" => throw new IllegalArgumentException("not supported yet")
       case _ => null
     }
     PyDF(dfAgg)
@@ -70,7 +72,8 @@ case class PyDF(df: DF) {
 
   def pivot(keyCol: String, pivotByCol: String,
             pivotedCols: JArrayList[String]): PyDF = {
-    PyDF(df.pivot(keyCol, pivotByCol, pivotedCols.asScala.toList))
+   // PyDF(df.pivot(keyCol, pivotByCol, pivotedCols.asScala.toList))
+    this
   }
 
   def writeToCSV(file: String, separator: String, singlePart: Boolean,
@@ -104,7 +107,7 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   def list(numRows: Int) = col.list(numRows)
 
   override def toString = {
-    val name = s"${col.rdd.name}".split('/').last.split('.').head
+    val name = s"${col.name}".split('/').last.split('.').head
     s"$name\t${col.colType}"
   }
 
@@ -146,8 +149,8 @@ case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
     //FIXME: other types
     val jrdd: JavaRDD[T] = BigDFPyRDD.javaRDD(c)
     val tpe = classTag[T]
-    if (tpe == classTag[Double]) PyColumn[Double](Column(col.sc, jrdd.rdd.asInstanceOf[RDD[Double]], -1))
-    else if (tpe == classTag[String]) PyColumn(Column(col.sc, jrdd.rdd.asInstanceOf[RDD[String]], -1))
+    if (tpe == classTag[Double]) PyColumn[Double](Column(jrdd.rdd.asInstanceOf[RDD[Double]]))
+    else if (tpe == classTag[String]) PyColumn(Column(jrdd.rdd.asInstanceOf[RDD[String]]))
     else null
   }
 
@@ -177,14 +180,14 @@ object PyColumn {
   def fromRDD[T: ClassTag](rdd: RDD[T]) = {
     //FIXME: other types
     val tpe = classTag[T]
-    if (tpe == classTag[Double]) PyColumn(Column(rdd.sparkContext, rdd.asInstanceOf[RDD[Double]], -1))
-    else if (tpe == classTag[String]) PyColumn(Column(rdd.sparkContext, rdd.asInstanceOf[RDD[String]], -1))
+    if (tpe == classTag[Double]) PyColumn(Column(rdd.asInstanceOf[RDD[Double]]))
+    else if (tpe == classTag[String]) PyColumn(Column(rdd.asInstanceOf[RDD[String]]))
     else null
   }
 }
 
 
-case class PyPredicate(p: Predicate) {
+case class PyPredicate(p: SColumn) {
   def And(that: PyPredicate) = {
     PyPredicate(this.p && that.p)
   }
@@ -202,7 +205,7 @@ object PyPredicate {
   def where[T](column: PyColumn[T], operator: String, value: Double): PyPredicate = {
     val filter = operator match {
       case "==" => column.col === value
-      case "!=" => column.col != value
+      case "!=" => column.col !== value
       case "<" => column.col < value
       case "<=" => column.col <= value
       case ">" => column.col > value
@@ -214,7 +217,7 @@ object PyPredicate {
   def where[T](column: PyColumn[T], operator: String, value: String): PyPredicate = {
     val filter = operator match {
       case "==" => column.col === value
-      case "!=" => column.col != value
+      case "!=" => column.col !== value
       case "<" => column.col < value
       case "<=" => column.col <= value
       case ">" => column.col > value

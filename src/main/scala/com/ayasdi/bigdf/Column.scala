@@ -13,13 +13,10 @@ import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
-import org.apache.spark.storage.StorageLevel
-import org.apache.spark.sql.{Column => SColumn, Row, SQLContext, DataFrame, SparkColumnFunctions}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{Column => SColumn, Row, SQLContext, SparkColumnFunctions}
 
 /*
   Instead of using the typetag we use this "Enum" to make the compiler generate a
@@ -262,20 +259,33 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
    */
   def *(that: Column[_]) =  new Column(scol * that.scol)
 
-  /**
-   * compare every element in this column of doubles with a double
-   */
-  def ===(that: Column[_]) =  new Column(scol === that.scol)
+  def ===(that: Column[_]) = scol === that.scol
 
-  /**
-   * compare every element in this column of string with a string
-   */
-  def ===(that: String) =  new Column(scol === that)
+  def ===(that: Double) = scol === that
 
-  /**
-   * compare every element in this column of string with a string
-   */
-  def ===(that: Double) =  new Column(scol === that)
+  def !==(that: Column[_]) = scol !== that.scol
+
+  def !==(that: Double) = scol !== that
+
+  def >=(that: Double) = scol >= that
+
+  def <(that: Double) = scol < that
+
+  def >(that: Double) = scol > that
+
+  def <=(that: Double) = scol <= that
+
+  def ===(that: String) = scol === that
+
+  def !==(that: String) = scol !== that
+
+  def >=(that: String) = scol >= that
+
+  def <(that: String) = scol < that
+
+  def >(that: String) = scol > that
+
+  def <=(that: String) = scol <= that
 
   /**
    * apply a given function to a column to generate a new column
@@ -290,21 +300,23 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
   def dbl_map[U: ClassTag](mapper: Double => U) = {
     val mapped = if (isDouble) {
       doubleRdd.map { row => mapper(row) }
-    }
+    } else null
     if (classTag[U] == classTag[Double])
       Column(mapped.asInstanceOf[RDD[Double]])
-    else
+    else if (classTag[U] == classTag[String])
       Column(mapped.asInstanceOf[RDD[String]])
+    else null
   }
 
   def str_map[U: ClassTag](mapper: String => U) = {
     val mapped = if (isString) {
       stringRdd.map { row => mapper(row) }
-    }
+    } else null
     if (classTag[U] == classTag[Double])
       Column(mapped.asInstanceOf[RDD[Double]])
-    else
+    else if (classTag[U] == classTag[String])
       Column(mapped.asInstanceOf[RDD[String]])
+    else null
   }
 
 }
