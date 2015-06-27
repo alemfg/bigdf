@@ -39,19 +39,15 @@ private[bigdf] object ColumnZipper {
    * @param indices
    * @return RDD of columns zipped into Arrays
    */
-  def makeRows(df: DF, indices: Seq[Int]): RDD[Array[Any]] = {
-    val cols = indices.map { colIndex => df.column(colIndex) }
-    makeRows(cols)
-  }
 
   /**
    * zip columns to get rows as arrays
    * @param cols
    * @return RDD of columns zipped into Arrays
    */
-  def makeRows(cols: Seq[Column[Any]]): RDD[Array[Any]] = {
-    val first = cols.head.rdd
-    val rest = cols.tail.map(_.rdd)
+  def makeRows(cols: Seq[RDD[Any]]): RDD[Array[Any]] = {
+    val first = cols.head
+    val rest = cols.tail
 
     RDDtoZipRDDFunctions(first).zip(rest)
   }
@@ -59,9 +55,9 @@ private[bigdf] object ColumnZipper {
   /**
    * zip columns and apply mapper to zipped object
    */
-  def zipAndMap[U: ClassTag](cols: Seq[Column[Any]])(mapper: Array[Any] => U): RDD[U] = {
-    val first = cols.head.rdd
-    val rest = cols.tail.map(_.rdd)
+  def zipAndMap[U: ClassTag](cols: Seq[RDD[Any]])(mapper: Array[Any] => U): RDD[U] = {
+    val first = cols.head
+    val rest = cols.tail
 
     RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
       val temp = new Array[Any](iterSeq.length)

@@ -17,6 +17,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
+import org.apache.spark.sql.{Column => SColumn, DataFrame, SparkColumnFunctions}
 
 /*
   Instead of using the typetag we use this "Enum" to make the compiler generate a
@@ -51,14 +52,14 @@ object ColType {
  * One column in a DF. It is a collection of elements of the same type. Can be contained in at most one DF. Once
  * assigned to a DF cannot be "moved" to another DF. To do that make a copy using Column.makeCopy
  * @param sc spark context
- * @param rdd the RDD that holds the collection of elements
+ * @param scol spark sql/catalyst/dataframe column
  * @param index the index at which this Column exists in containing DF. -1 if not in a DF yet.
  * @param name the name of this Column in containing DF
  * @param df the containing DF
  * @tparam T type of the column's elements
  */
 class Column[+T: ru.TypeTag] private(val sc: SparkContext,
-                                     var rdd: RDD[Any] = null,
+                                     var scol: SColumn = null,
                                      var index: Int = -1,
                                      var name: String = "anon",
                                      var df: Option[DF]) {
@@ -72,68 +73,34 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   /**
    * count number of elements. although rdd is var not val the number of elements does not change
    */
-  lazy val count = rdd.count
+  lazy val count = {
+    require(!df.isEmpty, "Column is not in a DF")
+    df.get.rowCount
+  }
   val parseErrors = sc.accumulator(0L)
 
   /*
      what is the column type?
    */
   val tpe = ru.typeOf[T]
-  private[bigdf] val isDouble = tpe =:= ru.typeOf[Double]
-  private[bigdf] val isFloat = tpe =:= ru.typeOf[Float]
-  private[bigdf] val isString = tpe =:= ru.typeOf[String]
-  private[bigdf] val isShort = tpe =:= ru.typeOf[Short]
-  private[bigdf] val isLong = tpe =:= ru.typeOf[Long]
-  private[bigdf] val isArrayOfString = tpe =:= ru.typeOf[Array[String]]
-  private[bigdf] val isArrayOfDouble = tpe =:= ru.typeOf[Array[Double]]
-  private[bigdf] val isMapOfStringToFloat = tpe =:= ru.typeOf[mutable.Map[String, Float]]
+  private[bigdf] val isDouble = sqlType == DoubleType
+  private[bigdf] val isFloat = sqlType == FloatType
+  private[bigdf] val isString = sqlType == StringType
+  private[bigdf] val isShort = sqlType == ShortType
+  private[bigdf] val isLong = sqlType == LongType
+  private[bigdf] val isArrayOfString = sqlType == ArrayType(StringType)
+  private[bigdf] val isArrayOfDouble = sqlType == ArrayType(DoubleType)
+  private[bigdf] val isMapOfStringToFloat = sqlType == MapType(StringType, FloatType)
 
   /*
       use this for demux'ing in column type
       always use pattern matching, never if/else
    */
-  val colType: ColType.EnumVal = if (isDouble) ColType.Double
-  else if (isFloat) ColType.Float
-  else if (isShort) ColType.Short
-  else if(isLong) ColType.Long
-  else if (isString) ColType.String
-  else if (isArrayOfString) ColType.ArrayOfString
-  else if (isMapOfStringToFloat) ColType.MapOfStringToFloat
-  else if (isArrayOfDouble) ColType.ArrayOfDouble
-  else ColType.Undefined
+  val colType: ColType.EnumVal = SparkUtil.sqlToColType(sqlType)
 
-  val sqlType: DataType = if (isDouble) DoubleType
-  else if (isFloat) FloatType
-  else if (isShort) ShortType
-  else if (isLong) LongType
-  else if (isString) StringType
-  else if (isArrayOfString) ArrayType(StringType)
-  else if (isMapOfStringToFloat) MapType(StringType, FloatType)
-  else if (isArrayOfDouble) ArrayType(DoubleType)
-  else {
-    throw new Exception("Unknown column type")
-    null
-  }
+  val sqlType: DataType = new SparkColumnFunctions(scol).dataType
 
-  lazy val csvWritable = isDouble || isFloat || isShort || isString
-
-  /**
-   * Spark uses ClassTag but bigdf uses the more functional TypeTag. This method compares the two.
-   * @tparam C classtag to compare
-   * @return true if this column type and passed in classtag are the same, false otherwise
-   */
-  def compareType[C: ClassTag] = {
-    if (isDouble) classTag[C] == classTag[Double]
-    else if (isFloat) classTag[C] == classTag[Double]
-    else if (isString) classTag[C] == classTag[String]
-    else if (isShort) classTag[C] == classTag[Short]
-    else if (isLong) classTag[C] == classTag[Long]
-    else if (isArrayOfString) classTag[C] == classTag[Array[String]]
-    else if (isArrayOfDouble) classTag[C] == classTag[Array[Double]]
-    else if (isFloat) classTag[C] == classTag[Float]
-    else if (isMapOfStringToFloat) classTag[C] == classTag[mutable.Map[String, Float]]
-    else false
-  }
+  lazy val csvWritable = isDouble || isFloat || isShort || isString || isLong
 
   def castDouble = {
     require(isDouble)
@@ -171,31 +138,23 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
   }
 
   override def toString = {
-    s"rdd: ${rdd.name} index: $index type: $colType"
+    s"scol: ${scol.toString()} index: $index type: $colType"
   }
 
   /**
    * print brief description of this column, processes the whole column
    */
   def describe(): Unit = {
-    import com.ayasdi.bigdf.Implicits._
-    val c = if (rdd != null) count else 0
+    val c = if(df.isEmpty) 0 else count
     println(s"\ttype:${colType}\n\tcount:${c}\n\tparseErrors:${parseErrors}")
-    if (isDouble) castDouble.printStats
+    if (isDouble) df.get.describe(name)
   }
 
   /**
    * get the upto max entries in the column as strings
    */
   def head(max: Int): Array[String] = {
-    colType match {
-      case ColType.Double | ColType.Float => doubleRdd.take(max).map { d => f"$d%8.4f" }
-      case ColType.String => stringRdd.take(max).map { s => f"$s%20s" }
-      //FIXME:      case ColType.Short => shortRdd.take(max).map { s => f"$s%3d"}
-      case _ => rdd.take(max).map {
-        _.toString
-      }
-    }
+
   }
 
   /**
