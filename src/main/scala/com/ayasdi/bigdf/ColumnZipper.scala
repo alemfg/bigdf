@@ -20,25 +20,6 @@ import org.apache.spark.rdd.RDD
  * object(one per partition) is used and only the result of desired processing is instantiated in bulk
  */
 private[bigdf] object ColumnZipper {
-  /**
-   * zip columns to get rows as lists
-   * @param df
-   * @param indices
-   * @return
-   */
-  def makeList(df: DF, indices: Seq[Int]) = {
-    val arrays = makeRows(df, indices)
-    arrays.map {
-      _.toList
-    }
-  }
-
-  /**
-   * zip columns to get rows as arrays
-   * @param df
-   * @param indices
-   * @return RDD of columns zipped into Arrays
-   */
 
   /**
    * zip columns to get rows as arrays
@@ -79,9 +60,9 @@ private[bigdf] object ColumnZipper {
   /**
    * zip columns and apply mapper to zipped object
    */
-  def zipAndFilter(cols: Seq[Column[Any]])(matcher: Array[Any] => Boolean): RDD[Boolean] = {
-    val first = cols.head.rdd
-    val rest = cols.tail.map(_.rdd)
+  def zipAndFilter(cols: Seq[RDD[Any]])(matcher: Array[Any] => Boolean): RDD[Boolean] = {
+    val first = cols.head
+    val rest = cols.tail
 
     RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
       val temp = new Array[Any](iterSeq.length)
@@ -109,53 +90,6 @@ private[bigdf] object ColumnZipper {
           while(!nextOne) tryNext
           thisOne
         }
-      }
-    }
-  }
-
-  /**
-   * zip columns and apply mapper to zipped object
-   */
-  def zipAndMapSideCombine[K, C: ru.TypeTag, V: ru.TypeTag](keyCols: Seq[Column[Any]],
-                                                            valueCol: RDD[V],
-                                                            createKey: Array[Any] => K,
-                                                            createCombiner: V => C,
-                                                            mergeValue: (C, V) => C): RDD[(K, C)] = {
-    val first = valueCol
-    val rest = keyCols.map(_.rdd)
-
-    val vClassTag = SparkUtil.typeTagToClassTag[V]
-
-    RDDtoZipRDDFunctions(first)(vClassTag).zipPartitions[(K, C)](rest, false) { iterSeq =>
-      zipAndMapSideCombiner(iterSeq, createKey, createCombiner, mergeValue)
-    }
-  }
-
-  def zipAndMapSideCombiner[K, C, V](iterSeq: Seq[Iterator[Any]],
-                                     createKey: Array[Any] => K,
-                                     createCombiner: V => C,
-                                     mergeValue: (C, V) => C) = {
-    val temp = new Array[Any](iterSeq.length)
-    val map = new JHashMap[K, C]
-    val valueColIter = iterSeq.head
-    valueColIter.foreach { element =>
-      val v = element.asInstanceOf[V]
-      var i = 0
-      iterSeq.tail.foreach { iter =>
-        temp(i) = iter.next
-        i += 1
-      }
-      val k = createKey(temp)
-      val old = map.get(k)
-      map.put(k, if (old == null) createCombiner(v) else mergeValue(old, v))
-    }
-    val mapIter = map.entrySet().iterator()
-    new Iterator[(K, C)] {
-      def hasNext = mapIter.hasNext()
-
-      def next = {
-        val x = mapIter.next()
-        (x.getKey, x.getValue)
       }
     }
   }

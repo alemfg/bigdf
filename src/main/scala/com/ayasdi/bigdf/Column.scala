@@ -15,9 +15,11 @@ import scala.reflect.{ClassTag, classTag}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.sql.{Column => SColumn, DataFrame, SparkColumnFunctions}
+import org.apache.spark.sql.{Column => SColumn, Row, SQLContext, DataFrame, SparkColumnFunctions}
+import org.apache.spark.sql.functions._
 
 /*
   Instead of using the typetag we use this "Enum" to make the compiler generate a
@@ -51,18 +53,19 @@ object ColType {
 /**
  * One column in a DF. It is a collection of elements of the same type. Can be contained in at most one DF. Once
  * assigned to a DF cannot be "moved" to another DF. To do that make a copy using Column.makeCopy
- * @param sc spark context
  * @param scol spark sql/catalyst/dataframe column
  * @param index the index at which this Column exists in containing DF. -1 if not in a DF yet.
  * @param name the name of this Column in containing DF
  * @param df the containing DF
  * @tparam T type of the column's elements
  */
-class Column[+T: ru.TypeTag] private(val sc: SparkContext,
-                                     var scol: SColumn = null,
+class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
                                      var index: Int = -1,
                                      var name: String = "anon",
-                                     var df: Option[DF]) {
+                                     var df: Option[DF] = None) {
+
+  val sc = df.get.sdf.sqlContext.sparkContext
+
   /**
    * set names for categories
    * FIXME: this should be somewhere else not in Column[T]
@@ -154,24 +157,18 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    * get the upto max entries in the column as strings
    */
   def head(max: Int): Array[String] = {
-
+    df.get.sdf.select(name).head(max).map(_.toString())
   }
 
   /**
-   * make a clone of this column, the clone does not belong to any DF  and has no name
+   * make a clone of this column, the clone does not belong to any DF and has no name
    */
-  def makeCopy = Column[T](sc, rdd.asInstanceOf[RDD[T]])
+  def makeCopy = new Column[T](scol)
 
   /**
    * print upto max(default 10) elements
    */
   def list(max: Int = 10): Unit = head(max).foreach(println)
-
-  /**
-   * distinct
-   * FIXME: should this return a column?
-   */
-  def distinct = rdd.distinct
 
   /**
    * does the column have any NA
@@ -241,190 +238,44 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    */
   def getRdd[R: ru.TypeTag] = {
     require(ru.typeOf[R] =:= ru.typeOf[T], s"s${ru.typeOf[R]} does not match s${ru.typeOf[T]}")
-    rdd.asInstanceOf[RDD[R]]
-  }
-
-  /**
-   * transform column of doubles to a categorical column (column of shorts)
-   * FIXME: improve this
-   */
-  def asCategorical = {
-    require(isDouble)
-    Column.asShorts(sc, doubleRdd, -1, doubleRdd.getStorageLevel, name, None)
+    require(!df.isEmpty)
+    df.get.sdf.select(name).rdd.map(_(0)).asInstanceOf[RDD[R]]
   }
 
   /**
    * add two columns
    */
-  def +(that: Column[_]) = {
-    if (isDouble && that.isDouble)
-      ColumnOfDoublesOps.withColumnOfDoubles(sc, this.castDouble,
-        that.castDouble, DoubleOps.addDouble)
-    else if (isString && that.isDouble)
-      ColumnOfStringsOps.withColumnOfDoubles(sc, this.castString,
-        that.castDouble, StringOps.addDouble)
-    else null
-  }
+  def +(that: Column[_]) = new Column(scol + that.scol)
 
   /**
    * subtract a column from another
    */
-  def -(that: Column[_]) = {
-    if (isDouble && that.isDouble)
-      ColumnOfDoublesOps.withColumnOfDoubles(sc, this.castDouble,
-        that.castDouble, DoubleOps.subtract)
-        .asInstanceOf[Column[Any]]
-    else null
-  }
+  def -(that: Column[_]) =  new Column(scol - that.scol)
 
   /**
    * divide a column by another
    */
-  def /(that: Column[_]) = {
-    if (isDouble && that.isDouble)
-      ColumnOfDoublesOps.withColumnOfDoubles(sc, this.castDouble,
-        that.castDouble, DoubleOps.divide)
-        .asInstanceOf[Column[Any]]
-    else null
-  }
+  def /(that: Column[_]) =  new Column(scol / that.scol)
 
   /**
    * multiply a column with another
    */
-  def *(that: Column[_]) = {
-    if (isDouble && that.isDouble)
-      ColumnOfDoublesOps.withColumnOfDoubles(sc, this.castDouble,
-        that.castDouble, DoubleOps.multiply)
-        .asInstanceOf[Column[Any]]
-    else null
-  }
-
-  /**
-   * generate a Column of boolean. true if this column is greater than another
-   */
-  def >>(that: Column[_]) = {
-    if (isDouble && that.isDouble)
-      ColumnOfDoublesOps.withColumnOfDoubles(sc, this.castDouble,
-        that.castDouble, DoubleOps.gt)
-    else if (isString && that.isString)
-      ColumnOfStringsOps.withColumnOfString(sc, this.castString,
-        that.castString, StringOps.gt)
-    else null
-  }
-
-  /**
-   * compare two columns
-   */
-  def ===(that: Column[_]): Predicate = {
-    if (isDouble && that.isDouble)
-      new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.eqColumn)
-    else if (isString && that.isString)
-      new StringColumnWithStringColumnCondition(index, that.index, StringOps.eqColumn)
-    else
-      null
-  }
-
-  def >(that: Column[_]): Predicate = {
-    if (isDouble && that.isDouble)
-      new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.gtColumn)
-    else if (isString && that.isString)
-      new StringColumnWithStringColumnCondition(index, that.index, StringOps.gtColumn)
-    else
-      null
-  }
-
-  def >=(that: Column[_]): Predicate = {
-    if (isDouble && that.isDouble)
-      new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.gteColumn)
-    else if (isString && that.isString)
-      new StringColumnWithStringColumnCondition(index, that.index, StringOps.gteColumn)
-    else
-      null
-  }
-
-  def <(that: Column[_]): Predicate = {
-    if (isDouble && that.isDouble)
-      new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.ltColumn)
-    else if (isString && that.isString)
-      new StringColumnWithStringColumnCondition(index, that.index, StringOps.ltColumn)
-    else
-      null
-  }
-
-  def <=(that: Column[_]): Predicate = {
-    if (isDouble && that.isDouble)
-      new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.lteColumn)
-    else if (isString && that.isString)
-      new StringColumnWithStringColumnCondition(index, that.index, StringOps.lteColumn)
-    else
-      null
-  }
-
-  def !=(that: Column[_]): Predicate = {
-    if (isDouble && that.isDouble)
-      new DoubleColumnWithDoubleColumnCondition(index, that.index, DoubleOps.neqColumn)
-    else if (isString && that.isString)
-      new StringColumnWithStringColumnCondition(index, that.index, StringOps.neqColumn)
-    else
-      null
-  }
+  def *(that: Column[_]) =  new Column(scol * that.scol)
 
   /**
    * compare every element in this column of doubles with a double
    */
-  def ===(that: Double) = {
-    if (isDouble)
-      new DoubleColumnWithDoubleScalarCondition(index, DoubleOps.eqFilter(that))
-    else
-      null
-  }
+  def ===(that: Column[_]) =  new Column(scol === that.scol)
 
   /**
    * compare every element in this column of string with a string
    */
-  def ===(that: String) = {
-    if (isString)
-      new StringColumnWithStringScalarCondition(index, StringOps.eqFilter(that))
-    else
-      null
-  }
+  def ===(that: String) =  new Column(scol === that)
 
   /**
-   * compare every element in this column of doubles with a double
+   * compare every element in this column of string with a string
    */
-  def !=(that: Double) = {
-    if (isDouble)
-      new DoubleColumnWithDoubleScalarCondition(index, DoubleOps.neqFilter(that))
-    else
-      null
-  }
-
-  /**
-   * compare every element in this column of strings with a string
-   */
-  def !=(that: String) = {
-    if (isString)
-      new StringColumnWithStringScalarCondition(index, StringOps.neqFilter(that))
-    else
-      null
-  }
-
-  /**
-   * filter using custom function
-   */
-  def filter(f: Double => Boolean) = {
-    if (isDouble)
-      new DoubleColumnCondition(index, f)
-    else
-      null
-  }
-
-  def filter(f: String => Boolean) = {
-    if (isString)
-      new StringColumnCondition(index, f)
-    else
-      null
-  }
+  def ===(that: Double) =  new Column(scol === that)
 
   /**
    * apply a given function to a column to generate a new column
@@ -432,9 +283,8 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
    */
   def map[U: ru.TypeTag, V: ru.TypeTag](mapper: U => V) = {
     require(ru.typeOf[U] =:= tpe)
-    implicit val vTpe = SparkUtil.typeTagToClassTag(ru.typeTag[V])
-    val mapped = getRdd[U].map { row => mapper(row) }
-    Column[V](sc, mapped.asInstanceOf[RDD[V]])
+    val sdf = df.get.sdf.select(callUDF(mapper, SparkUtil.typeTagToSql(ru.typeOf[V]), df.get.sdf(name)))
+    sdf.col("*")
   }
 
   def dbl_map[U: ClassTag](mapper: Double => U) = {
@@ -442,9 +292,9 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       doubleRdd.map { row => mapper(row) }
     }
     if (classTag[U] == classTag[Double])
-      Column(sc, mapped.asInstanceOf[RDD[Double]])
+      Column(mapped.asInstanceOf[RDD[Double]])
     else
-      Column(sc, mapped.asInstanceOf[RDD[String]])
+      Column(mapped.asInstanceOf[RDD[String]])
   }
 
   def str_map[U: ClassTag](mapper: String => U) = {
@@ -452,82 +302,23 @@ class Column[+T: ru.TypeTag] private(val sc: SparkContext,
       stringRdd.map { row => mapper(row) }
     }
     if (classTag[U] == classTag[Double])
-      Column(sc, mapped.asInstanceOf[RDD[Double]])
+      Column(mapped.asInstanceOf[RDD[Double]])
     else
-      Column(sc, mapped.asInstanceOf[RDD[String]])
+      Column(mapped.asInstanceOf[RDD[String]])
   }
 
 }
 
 object Column {
   /**
-   * Parse an RDD of Strings into a Column of Doubles. Parse errors are counted in parseErrors field.
-   * Items with parse failures become NaNs
-   */
-  def asDoubles(sCtx: SparkContext, stringRdd: RDD[String], index: Int,
-                cacheLevel: StorageLevel, opts: NumberParsingOpts, name: String, df: Option[DF]) = {
-    val col = new Column[Double](sCtx, null, index, name, df)
-    val parseErrors = col.parseErrors
-
-    val doubleRdd = stringRdd.map { x => SchemaUtils.parseDouble(parseErrors, x, opts) }
-    doubleRdd.setName(s"${stringRdd.name}.toDouble").persist(cacheLevel)
-    col.rdd = doubleRdd.asInstanceOf[RDD[Any]]
-
-    col
-  }
-
-  /**
-   * Parse an RDD of Strings into a Column of Floats. Parse errors are counted in parseErrors field
-   * Items with parse failures become NaNs
-   */
-  def asFloats(sCtx: SparkContext, stringRdd: RDD[String], index: Int, cacheLevel: StorageLevel) = {
-    val col = new Column[Float](sCtx, null, index, "asFloats", None)
-    val parseErrors = col.parseErrors
-
-    val floatRdd = stringRdd.map { x =>
-      var y = Float.NaN
-      try {
-        y = x.toFloat
-      } catch {
-        case _: java.lang.NumberFormatException => parseErrors += 1
-      }
-      y
-    }
-    floatRdd.setName(s"${stringRdd.name}.toFloat").persist(cacheLevel)
-    col.rdd = floatRdd.asInstanceOf[RDD[Any]]
-
-    col
-  }
-
-  /**
-   * Map an RDD of Doubles into a Column of Shorts representing categories.
-   * Errors are counted in parseErrors field.
-   * Column of categories aka Categorical column has operations for categories like One Hot Encode etc
-   */
-  def asShorts(sCtx: SparkContext,
-               doubleRdd: RDD[Double],
-               index: Int,
-               cacheLevel: StorageLevel,
-               name: String, df: Option[DF]) = {
-    val col = new Column[Short](sCtx, null, index, name, df)
-    val parseErrors = col.parseErrors
-
-    val shortRdd = doubleRdd.map { x =>
-      val y = x.toShort
-      if (y != x || x.isNaN) parseErrors += 1
-      y
-    }
-
-    shortRdd.setName(name).persist(cacheLevel)
-    col.rdd = shortRdd.asInstanceOf[RDD[Any]]
-
-    col
-  }
-
-  /**
    * create Column from existing RDD
    */
-  def apply[T: ru.TypeTag](sCtx: SparkContext, rdd: RDD[T], index: Int = -1, name: String = s"fromRdd") = {
-    new Column[T](sCtx, rdd.asInstanceOf[RDD[Any]], index, name, None)
+  def apply[T: ru.TypeTag](rdd: RDD[T], index: Int = -1, name: String = s"fromRdd") = {
+    val tpe = ru.typeOf[T]
+    val sqlContext = new SQLContext(rdd.sparkContext)
+    sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
+    val rows = rdd.map(Row(_))
+    val sdf = sqlContext.createDataFrame(rows, StructType(List(StructField(name, SparkUtil.typeTagToSql(tpe)))))
+    new Column[T](sdf.col(name), index, name, None)
   }
 }

@@ -72,7 +72,7 @@ case class DF private(var sdf: DataFrame,
    * @param indices sequence of numeric column indices, by default all columns
    * @return sequence of Columns
    */
-  def columns(indices: Seq[Int] = 0 until columnCount) = {
+  def columnsByIndices(indices: Seq[Int] = 0 until columnCount) = {
     indices.map { colIndex => column(colIndex) }
   }
 
@@ -81,7 +81,7 @@ case class DF private(var sdf: DataFrame,
    * @param colNames sequence of numeric column indices, by default all columns
    * @return sequence of Columns
    */
-  def columns(colNames: Seq[String]) = {
+  def columnsByName(colNames: Seq[String]) = {
     colNames.map { colName => column(colName) }
   }
 
@@ -90,7 +90,7 @@ case class DF private(var sdf: DataFrame,
    * @param indexRanges sequence of numeric column indices, by default all columns
    * @return sequence of Columns
    */
-  def columns(indexRanges: Seq[Range]) = for (
+  def columnsByRanges(indexRanges: Seq[Range]) = for (
     indexRange <- indexRanges;
     index <- indexRange
   ) yield column(index)
@@ -168,11 +168,11 @@ case class DF private(var sdf: DataFrame,
       s"Unexpected argument list of type $tpe")
 
     if (tpe =:= ru.typeOf[Int])
-      columns(items.asInstanceOf[Seq[Int]])
+      columnsByIndices(items.asInstanceOf[Seq[Int]])
     else if (tpe =:= ru.typeOf[String])
-      columns(items.asInstanceOf[Seq[String]])
+      columnsByNames(items.asInstanceOf[Seq[String]])
     else if (tpe =:= ru.typeOf[Range] || tpe =:= ru.typeOf[Inclusive])
-      columns(items.asInstanceOf[Seq[Range]])
+      columnsByRanges(items.asInstanceOf[Seq[Range]])
     else null
   }
 
@@ -393,13 +393,13 @@ case class DF private(var sdf: DataFrame,
    * get a column identified by its name
    * @param colName name of the column
    */
-  def column(colName: String) = sdf.col(colName)
+  def column(colName: String) = new Column(sdf.col(colName))
 
   /**
    * get a column identified by its numerical index
    * @param colIndex index of the column
    */
-  def column(colIndex: Int) = sdf.col(sdf.columns(colIndex))
+  def column(colIndex: Int) = new Column(sdf.col(sdf.columns(colIndex)))
 
   def delete(colName: String): Unit = sdf.drop(colName)
 
@@ -411,7 +411,7 @@ case class DF private(var sdf: DataFrame,
   /**
    * print brief description of the DF
    */
-  def describe(colNames: String*) = sdf.describe(colNames)
+  def describe(colNames: String*) = sdf.describe(colNames:_*)
 
   /**
    * print upto numRows x numCols elements of the dataframe

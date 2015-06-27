@@ -70,6 +70,7 @@ object FileUtils {
 
   def dirToFiles(path: String, recursive: Boolean = true, pattern: String)(implicit sc: SparkContext) = {
     import scala.collection.mutable.MutableList
+
     import org.apache.hadoop.fs._
 
     val fs = FileSystem.get(sc.hadoopConfiguration)
@@ -136,6 +137,12 @@ object SparkUtil {
     case ColType.MapOfStringToFloat => MapType(StringType, FloatType)
     case _ => throw new Exception(s"Unsupported type: $colType")
   }
+
+  def typeTagToSql(tpe: ru.Type) = if (tpe =:= ru.typeOf[Double]) DoubleType
+    else if (tpe =:= ru.typeOf[String]) StringType
+    else if (tpe =:= ru.typeOf[Long]) LongType
+    else if (tpe =:= ru.typeOf[Short]) ShortType
+    else throw new IllegalArgumentException(s"Type not supported: $tpe")
 
   def typeTagToClassTag[V: ru.TypeTag] = {
     val mirror = ru.runtimeMirror(getClass.getClassLoader)
