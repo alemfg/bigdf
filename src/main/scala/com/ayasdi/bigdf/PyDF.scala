@@ -103,7 +103,7 @@ object PyDF {
   }
 }
 
-case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
+case class PyColumn[+T: ru.TypeTag](col: Column) {
   def list(numRows: Int) = col.list(numRows)
 
   override def toString = {

@@ -10,7 +10,7 @@ import java.util.{HashSet => JHashSet}
 import scala.collection.JavaConversions.asScalaSet
 import scala.collection.mutable
 
-class RichColumnMaps[K, V](self: Column[mutable.Map[K, V]]) {
+class RichColumnMaps[K, V](self: Column) {
 
   def expand(df: DF, keys: Set[String] = null, namePrefix: String = "expanded_"): Unit = {
     require(self.colType == ColType.MapOfStringToFloat) //TODO: support can be added for others

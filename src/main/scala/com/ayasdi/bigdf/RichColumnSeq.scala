@@ -13,8 +13,7 @@ import scala.reflect.{ClassTag, classTag}
  * Sequence of columns from a DF
  * @param cols  sequence of pairs. Each pair is a column name and the Column
  */
-case class RichColumnSeq(val cols: Seq[Column[Any]]) {
-  val sc = cols(0).sc
+case class RichColumnSeq(val cols: Seq[Column]) {
 
   def describe() {
     cols.foreach { col =>
@@ -22,7 +21,6 @@ case class RichColumnSeq(val cols: Seq[Column[Any]]) {
         println(col.toString)
     }
   }
-
 
   override def toString() = {
     cols.map { x =>

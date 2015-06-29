@@ -54,98 +54,59 @@ object ColType {
  * @param index the index at which this Column exists in containing DF. -1 if not in a DF yet.
  * @param name the name of this Column in containing DF
  * @param df the containing DF
- * @tparam T type of the column's elements
  */
-class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
-                                     var index: Int = -1,
-                                     var name: String = "anon",
-                                     var df: Option[DF] = None) {
-
-  val sc = df.get.sdf.sqlContext.sparkContext
-
+class Column private[bigdf](var scol: SColumn,
+                            var index: Int = -1,
+                            var name: String = "anon",
+                            var df: Option[DF] = None) {
   /**
    * set names for categories
-   * FIXME: this should be somewhere else not in Column[T]
+   * FIXME: this should be somewhere else not in Column
    */
   val catNameToNum: mutable.Map[String, Short] = new JHashMap[String, Short]
   val catNumToName: mutable.Map[Short, String] = new JHashMap[Short, String]
 
   /**
-   * count number of elements. although rdd is var not val the number of elements does not change
+   * count number of elements.
    */
-  lazy val count = {
+  def count = {
     require(!df.isEmpty, "Column is not in a DF")
     df.get.rowCount
   }
-  val parseErrors = sc.accumulator(0L)
-
-  /*
-     what is the column type?
-   */
-  val tpe = ru.typeOf[T]
-  private[bigdf] val isDouble = sqlType == DoubleType
-  private[bigdf] val isFloat = sqlType == FloatType
-  private[bigdf] val isString = sqlType == StringType
-  private[bigdf] val isShort = sqlType == ShortType
-  private[bigdf] val isLong = sqlType == LongType
-  private[bigdf] val isArrayOfString = sqlType == ArrayType(StringType)
-  private[bigdf] val isArrayOfDouble = sqlType == ArrayType(DoubleType)
-  private[bigdf] val isMapOfStringToFloat = sqlType == MapType(StringType, FloatType)
+  val parseErrors = 0 //FIXME: sc.accumulator(0L)
 
   /*
       use this for demux'ing in column type
       always use pattern matching, never if/else
    */
-  val colType: ColType.EnumVal = SparkUtil.sqlToColType(sqlType)
+  lazy val sqlType: DataType = new SparkColumnFunctions(scol).dataType
+  lazy val colType: ColType.EnumVal = SparkUtil.sqlToColType(sqlType)
 
-  val sqlType: DataType = new SparkColumnFunctions(scol).dataType
+  private[bigdf] def isDouble = sqlType == DoubleType
+  private[bigdf] def isFloat = sqlType == FloatType
+  private[bigdf] def isString = sqlType == StringType
+  private[bigdf] def isShort = sqlType == ShortType
+  private[bigdf] def isLong = sqlType == LongType
+  private[bigdf] def isArrayOfString = sqlType == ArrayType(StringType)
+  private[bigdf] def isArrayOfDouble = sqlType == ArrayType(DoubleType)
+  private[bigdf] def isMapOfStringToFloat = sqlType == MapType(StringType, FloatType)
 
   lazy val csvWritable = isDouble || isFloat || isShort || isString || isLong
 
-  def castDouble = {
-    require(isDouble)
-    this.asInstanceOf[Column[Double]]
-  }
-
-  def castString = {
-    require(isString)
-    this.asInstanceOf[Column[String]]
-  }
-
-  def castFloat = {
-    require(isFloat)
-    this.asInstanceOf[Column[Float]]
-  }
-
-  def castShort = {
-    require(isShort)
-    this.asInstanceOf[Column[Short]]
-  }
-
-  def castLong= {
-    require(isShort)
-    this.asInstanceOf[Column[Long]]
-  }
-
-  def castArrayOfString = {
-    require(isArrayOfString)
-    this.asInstanceOf[Column[Array[String]]]
-  }
-
-  def castMapStringToFloat = {
-    require(isMapOfStringToFloat)
-    this.asInstanceOf[Column[mutable.Map[String, Float]]]
-  }
-
   override def toString = {
     s"scol: ${scol.toString()} index: $index type: $colType"
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case that: Column => that.scol.equals(this.scol)
+    case _ => false
   }
 
   /**
    * print brief description of this column, processes the whole column
    */
   def describe(): Unit = {
-    val c = if(df.isEmpty) 0 else count
+    val c = if (df.isEmpty) 0 else count
     println(s"\ttype:${colType}\n\tcount:${c}\n\tparseErrors:${parseErrors}")
     if (isDouble) df.get.describe(name)
   }
@@ -160,7 +121,7 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
   /**
    * make a clone of this column, the clone does not belong to any DF and has no name
    */
-  def makeCopy = new Column[T](scol)
+  def makeCopy = new Column(scol)
 
   /**
    * print upto max(default 10) elements
@@ -234,7 +195,7 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
    * @return RDD of R's. throws exception if the cast is not applicable to this column
    */
   def getRdd[R: ru.TypeTag] = {
-    require(ru.typeOf[R] =:= ru.typeOf[T], s"s${ru.typeOf[R]} does not match s${ru.typeOf[T]}")
+    require(SparkUtil.typeTagToSql(ru.typeOf[R]) == sqlType, s"s${ru.typeOf[R]} does not match s${sqlType}")
     require(!df.isEmpty)
     df.get.sdf.select(name).rdd.map(_(0)).asInstanceOf[RDD[R]]
   }
@@ -242,22 +203,22 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
   /**
    * add two columns
    */
-  def +(that: Column[_]) = new Column(scol + that.scol)
+  def +(that: Column) = new Column(scol + that.scol)
 
   /**
    * subtract a column from another
    */
-  def -(that: Column[_]) =  new Column(scol - that.scol)
+  def -(that: Column) = new Column(scol - that.scol)
 
   /**
    * divide a column by another
    */
-  def /(that: Column[_]) =  new Column(scol / that.scol)
+  def /(that: Column) = new Column(scol / that.scol)
 
   /**
    * multiply a column with another
    */
-  def *(that: Column[_]) =  new Column(scol * that.scol)
+  def *(that: Column) = new Column(scol * that.scol)
 
   /**
    * add a number to a column
@@ -267,23 +228,23 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
   /**
    * subtract a number from a column
    */
-  def -(that: Double) =  new Column(scol - that)
+  def -(that: Double) = new Column(scol - that)
 
   /**
    * divide a column by a number
    */
-  def /(that: Double) =  new Column(scol / that)
+  def /(that: Double) = new Column(scol / that)
 
   /**
    * multiply a column with a number
    */
-  def *(that: Double) =  new Column(scol * that)
+  def *(that: Double) = new Column(scol * that)
 
-  def ===(that: Column[_]) = scol === that.scol
+  def ===(that: Column) = scol === that.scol
 
   def ===(that: Double) = scol === that
 
-  def !==(that: Column[_]) = scol !== that.scol
+  def !==(that: Column) = scol !== that.scol
 
   def !==(that: Double) = scol !== that
 
@@ -312,9 +273,9 @@ class Column[+T: ru.TypeTag] private[bigdf](var scol: SColumn = null,
    * the new column does not belong to any DF automatically
    */
   def map[U: ru.TypeTag, V: ru.TypeTag](mapper: U => V) = {
-    require(ru.typeOf[U] =:= tpe)
-    val sdf = df.get.sdf.select(callUDF(mapper, SparkUtil.typeTagToSql(ru.typeOf[V]), df.get.sdf(name)))
-    sdf.col("*")
+    require(SparkUtil.typeTagToSql(ru.typeOf[U]) == sqlType)
+    val newCol = callUDF(mapper, SparkUtil.typeTagToSql(ru.typeOf[V]), df.get.sdf(name))
+    new Column(newCol)
   }
 
   def dbl_map[U: ClassTag](mapper: Double => U) = {
@@ -351,6 +312,6 @@ object Column {
     sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
     val rows = rdd.map(Row(_))
     val sdf = sqlContext.createDataFrame(rows, StructType(List(StructField(name, SparkUtil.typeTagToSql(tpe)))))
-    new Column[T](sdf.col(name), index, name, None)
+    new Column(sdf.col(name), index, name, None)
   }
 }

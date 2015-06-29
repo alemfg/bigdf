@@ -7,12 +7,12 @@ package com.ayasdi.bigdf
 
 import scala.collection.immutable.Range.Inclusive
 import scala.reflect.runtime.{universe => ru}
+import com.databricks.spark.csv.{CsvParser => SParser}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql._
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Column => SColumn, _}
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.sql.{Column => SColumn}
 
 /**
  * types of joins
@@ -46,7 +46,7 @@ case class DF private(var sdf: DataFrame,
    * @return column of row indices
    */
   //  lazy val rowIndexCol = {
-  //    val col = Column[Double](sc, rowIndexRdd, -1, "rowIndexCol")
+  //    val col = Column(sc, rowIndexRdd, -1, "rowIndexCol")
   //    setColumn("rowIndexCol", col)
   //    col
   //  }
@@ -118,16 +118,12 @@ case class DF private(var sdf: DataFrame,
    * @param separator use this separator, default is comma
    * @param cols sequence of column names to include in output
    */
-  //  def toCSV(separator: String = ",", cols: Seq[String]) = {
-  //    val writeColNames = cols.filter(column(_).csvWritable)
-  //    val writeCols = writeColNames.map(column(_))
-  //
-  //    val rows = ColumnZipper.zipAndMap(writeCols) { row => row.mkString(separator) }
-  //    val header = writeColNames.mkString(separator)
-  //    val headerRdd = sc.parallelize(Array(header))
-  //    headerRdd.union(rows)
-  //  }
-  //
+    def toCSV(separator: String = ",", cols: Seq[String]) = {
+      FileUtils.removeAll("/tmp/xyz890")
+      writeToCSV("/tmp/xyz890", separator, false, cols)
+      sdf.sqlContext.sparkContext.textFile("/tmp/xyz890")
+    }
+
     /**
      * save the DF to a text file
      * @param file save DF in this file
@@ -138,7 +134,7 @@ case class DF private(var sdf: DataFrame,
                    separator: String = ",",
                    singlePart: Boolean = false,
                    cols: Seq[String] = columnNames): Unit = {
-      sdf.write.format("com.databricks.spark.csv").option("header", "true")
+      sdf.select(cols.head, cols.tail: _*).write.format("com.databricks.spark.csv").option("header", "true").save(file)
     }
 
   /**
@@ -157,7 +153,7 @@ case class DF private(var sdf: DataFrame,
    * or   myDF(0 to 0, 4 to 10, 6 to 1000)
    * @param items Sequence of names, indices or ranges. No mix n match yet
    */
-  def columns[T: ru.TypeTag](items: Seq[T]): Seq[Column[Any]] = {
+  def columns[T: ru.TypeTag](items: Seq[T]): Seq[Column] = {
     val tpe = ru.typeOf[T]
 
     require(tpe =:= ru.typeOf[Int] || tpe =:= ru.typeOf[String] ||
@@ -178,9 +174,10 @@ case class DF private(var sdf: DataFrame,
    * @param colName name of column, will be overwritten if it exists
    * @param that column to add to this df
    */
-  def setColumn(colName: String, that: Column[Any]) = {
+  def setColumn(colName: String, that: Column): Unit = {
     require(that.df.isEmpty && that.index == -1)
     sdf = sdf.withColumn(colName, that.scol) //FIXME: handle if exists case
+    that.df = Some(this)
   }
 
   /**
@@ -189,7 +186,7 @@ case class DF private(var sdf: DataFrame,
    * @param that column to add to this df
    */
   //FIXME: unit test
-  def setColumn(colIndex: Int, that: Column[Any]) = {
+  def setColumn(colIndex: Int, that: Column) = {
     require(that.df.isEmpty && that.index == -1 && colIndex < columnCount && column(that.name) == null)
     ???
   }
@@ -207,18 +204,6 @@ case class DF private(var sdf: DataFrame,
   def where(cond: SColumn): DF = {
     new DF(sdf.filter(cond), options, s"filtered:$name")
   }
-
-  /**
-   * slice the df to get a contiguous subset of rows
-   * @param indexRange row index range
-   * @return a new df
-   */
-  //  def rowsByRange(indexRange: Range): DF = {
-  //    val pred = (rowIndexCol >= indexRange.start.toDouble) &&
-  //      (rowIndexCol <= indexRange.end.toDouble)
-  //
-  //    where(pred)
-  //  }
 
   /**
    * rename columns
@@ -261,23 +246,22 @@ case class DF private(var sdf: DataFrame,
   }
 
   /**
-   * drops all row that have NAs
+   * drops all rows that have NAs
    */
-  def dropNA(): Unit = sdf.na.drop()
+  def dropNA(): Unit = { sdf = sdf.na.drop() }
 
+  def fillNA(fillValues: Map[String, Any]) = { sdf = sdf.na.fill(fillValues) }
   /**
    * aggregate one column after grouping by another
-   * @param aggByCol the columns to group by
-   * @param aggedCol the columns to be aggregated, only one for now TBD
-   * @param aggtor implementation of Aggregator
-   * @tparam U
-   * @tparam V
+   * @param aggByCol the column to group by
+   * @param aggdCol the columns to be aggregated
+   * @param aggtor the aggregation function name
    * @return new DF with first column aggByCol and second aggedCol
    */
   def aggregate[U: ru.TypeTag, V: ru.TypeTag, W: ru.TypeTag](aggByCol: String,
-                                                             aggedCol: String,
-                                                             aggtor: Aggregator[U, V, W]) = {
-    //    aggregateWithColumnStrategy(List(aggByCol), aggedCol, aggtor)
+                                                             aggdCol: String,
+                                                             aggtor: String): DF = {
+    aggregate(List(aggByCol), Map(aggdCol -> aggtor))
   }
 
 
@@ -287,119 +271,31 @@ case class DF private(var sdf: DataFrame,
    * @param aggdCols map of columns to be aggregated and their aggregation functions
    * @return new DF with first column aggByCol and second aggedCol
    */
-  def aggregate[U: ru.TypeTag, V: ru.TypeTag, W: ru.TypeTag](aggByCols: Seq[String],
-                                                             aggdCols: Map[String, String]) = {
+  def aggregate(aggByCols: Seq[String],
+                aggdCols: Map[String, String]): DF = {
     val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail:_*).agg(aggdCols)
-
     new DF(aggdSdf, options, s"aggd:$name")
   }
-
-  /**
-   * pivot the df and return a new df
-   * e.g. half-yearly sales in <salesperson, period H1 or H2, sales> format
-   * Jack, H1, 20
-   * Jack, H2, 21
-   * Jill, H1, 30
-   * Gary, H2, 44
-   * becomes "pivoted" to <salesperson, H1 sales, H2 sales>
-   * Jack, 20, 21
-   * Jill, 30, NaN
-   * Gary, NaN, 44
-   *
-   * The resulting df will typically have fewer rows and more columns
-   *
-   * @param  keyCol column that has "primary key" for the pivoted df e.g. salesperson
-   * @param pivotByCol column that is being removed e.g. period
-   * @param pivotedCols columns that are being pivoted e.g. sales, by default all columns are pivoted
-   * @return new pivoted DF
-   */
-  //  def pivot(keyCol: String,
-  //            pivotByCol: String,
-  //            pivotedCols: List[String] = nameToColumn.keys.toList): DF = {
-  //    val grped = groupBy(keyCol)
-  //    val pivotValues = column(pivotByCol).colType match {
-  //      case ColType.String => column(pivotByCol).distinct.collect.asInstanceOf[Array[String]]
-  //      case ColType.Double => column(pivotByCol).distinct.collect.asInstanceOf[Array[Double]]
-  //        .map {
-  //        _.toString
-  //      }
-  //      case _ => {
-  //        println(s"Pivot does not yet support columns ${column(pivotByCol)}")
-  //        null
-  //      }
-  //    }
-  //
-  //    val pivotIndex = nameToColumn.getOrElse(pivotByCol, null).index
-  //
-  //    /*
-  //        filter pivot by and key column from output
-  //     */
-  //    val cleanedPivotedCols = pivotedCols.map {
-  //      nameToColumn(_).index
-  //    }
-  //      .filter { colIndex => colIndex != nameToColumn(pivotByCol).index && colIndex != nameToColumn(keyCol).index }
-  //
-  //    val newDf = DF(sc, s"${name}_${keyCol}_pivot_${pivotByCol}", options)
-  //
-  //    /*
-  //        add key column to output
-  //     */
-  //    column(keyCol).colType match {
-  //      case ColType.String => newDf.setColumn(s"$keyCol",
-  //          Column(sc, grped.map(_._1.asInstanceOf[String])))
-  //      case ColType.Double =>  newDf.setColumn(s"$keyCol",
-  //          Column(sc, grped.map(_._1.asInstanceOf[Double])))
-  //      case _ => {
-  //        println(s"Pivot does not yet support columns ${column(keyCol)}")
-  //      }
-  //    }
-  //
-  //    /*
-  //        add pivoted columns
-  //     */
-  //    pivotValues.foreach { pivotValue =>
-  //      val grpSplit = new PivotHelper(grped, pivotIndex, pivotValue).get
-  //
-  //      cleanedPivotedCols.foreach { pivotedColIndex =>
-  //        nameToColumn(indexToColumnName(pivotedColIndex)).colType match {
-  //          case ColType.Double => {
-  //            val newColRdd = grpSplit.map {
-  //              case (k, v) =>
-  //                if (v.isEmpty) Double.NaN else v.head(pivotedColIndex).asInstanceOf[Double]
-  //            }
-  //            newDf.setColumn(s"D_${indexToColumnName(pivotedColIndex)}@$pivotByCol==$pivotValue",
-  //              Column(sc, newColRdd.asInstanceOf[RDD[Double]]))
-  //          }
-  //          case ColType.String => {
-  //            val newColRdd = grpSplit.map {
-  //              case (k, v) =>
-  //                if (v.isEmpty) "" else v.head(pivotedColIndex).asInstanceOf[String]
-  //            }
-  //            newDf.setColumn(s"S_${indexToColumnName(pivotedColIndex)}@$pivotByCol==$pivotValue",
-  //              Column(sc, newColRdd.asInstanceOf[RDD[String]]))
-  //          }
-  //          case _ => {
-  //            println(s"Pivot does not yet support columns ${column(pivotByCol)}")
-  //          }
-  //        }
-  //      }
-  //    }
-  //    newDf
-  //  }
 
   /**
    * get a column identified by its name
    * @param colName name of the column
    */
-  def column(colName: String) = new Column(sdf.col(colName))
+  def column(colName: String) = new Column(scol = sdf.col(colName),
+    index = sdf.columns.indexOf(colName),
+    name = colName,
+    df = Some(this))
 
   /**
    * get a column identified by its numerical index
    * @param colIndex index of the column
    */
-  def column(colIndex: Int) = new Column(sdf.col(sdf.columns(colIndex)))
+  def column(colIndex: Int) = new Column(scol = sdf.col(sdf.columns(colIndex)),
+    index = colIndex,
+    name = sdf.columns(colIndex),
+    df = Some(this))
 
-  def delete(colName: String): Unit = sdf.drop(colName)
+  def delete(colName: String): Unit = { sdf = sdf.drop(colName) }
 
   /**
    * group by using given columns as key
@@ -455,7 +351,7 @@ object DF {
     union(sc, dfs)
   }
 
-  def fromColumns(sc: SparkContext, cols: Seq[Column[_]], name: String, options: Options): DF = {
+  def fromColumns(sc: SparkContext, cols: Seq[Column], name: String, options: Options): DF = {
     val sqlContext = new SQLContext(sc)
     var sdf = sqlContext.emptyDataFrame
     cols.foreach { col =>
@@ -482,7 +378,18 @@ object DF {
                   options: Options = Options()): DF = {
     val sqlContext = new SQLContext(sc)
     sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
-    val sdf = sqlContext.read.format("com.databricks.spark.csv").option("header", "true").load(inFile)
+    val inferredSchema = SchemaUtils.inferSchema(sc, inFile, schema, options)
+
+    val sdf = new SParser().withUseHeader(true)
+      .withDelimiter(options.csvParsingOpts.delimiter)
+      .withEscape(options.csvParsingOpts.escapeChar)
+      .withQuoteChar(options.csvParsingOpts.quoteChar)
+      .withIgnoreLeadingWhiteSpace(options.csvParsingOpts.ignoreLeadingWhitespace)
+      .withIgnoreTrailingWhiteSpace(options.csvParsingOpts.ignoreTrailingWhiteSpace)
+      .withSchema(inferredSchema)
+      .withParseMode("PERMISSIVE")
+      .withParserLib("UNIVOCITY")
+      .csvFile(sqlContext, inFile)
 
     new DF(sdf, options, "fromCSV: $inFile")
   }
