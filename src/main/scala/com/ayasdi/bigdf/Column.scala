@@ -137,16 +137,8 @@ class Column private[bigdf](var scol: SColumn,
    * count the number of NAs
    */
   def countNA = {
-    colType match {
-      case ColType.Double => doubleRdd.filter(_.isNaN).count
-      case ColType.Float => floatRdd.filter(_.isNaN).count
-      case ColType.Long => 0L //Long cannot be NaN ?
-      case ColType.Short => 0L //FIXME: use nullable attribute
-      case ColType.String => stringRdd.filter(_.isEmpty).count
-      case _ => {
-        throw new RuntimeException(s"ERROR: No NA defined for column type ${colType}")
-      }
-    }
+    require(df.nonEmpty)
+    df.get.sdf.filter(scol.isNull).count
   }
 
   /**

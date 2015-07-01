@@ -7,12 +7,12 @@ package com.ayasdi.bigdf
 
 import scala.collection.immutable.Range.Inclusive
 import scala.reflect.runtime.{universe => ru}
-import com.databricks.spark.csv.{CsvParser => SParser}
 
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column => SColumn, _}
 import org.apache.spark.storage.StorageLevel
+import com.databricks.spark.csv.{CsvParser => SParser, CsvSchemaRDD}
 
 /**
  * types of joins
@@ -29,16 +29,16 @@ object JoinType extends Enumeration {
  * Internally, bigdf's DF is a wrapper on Spark's DataFrame that provides a more
  * pandas-like API e.g. mutability.
  */
-case class DF private(var sdf: DataFrame,
-                      val options: Options,
-                      val name: String) {
+class DF private(var sdf: DataFrame,
+                 val options: Options,
+                 val name: String) {
   /**
    * number of rows in df, this cannot change. any operation that changes this returns a new df
    * @return number of rows
    */
-  lazy val rowCount = sdf.count
+  def rowCount = sdf.count
 
-  //  lazy val rowIndexRdd = column(0).rdd.zipWithIndex().map(_._2.toDouble)
+  //lazy val rowIndexRdd = sdf.rcolumn(0).rdd.zipWithIndex().map(_._2.toDouble)
 
   /**
    * creates(if not already present) a column with name rowIndexCol that contains a series from zero
@@ -118,24 +118,31 @@ case class DF private(var sdf: DataFrame,
    * @param separator use this separator, default is comma
    * @param cols sequence of column names to include in output
    */
-    def toCSV(separator: String = ",", cols: Seq[String]) = {
-      FileUtils.removeAll("/tmp/xyz890")
-      writeToCSV("/tmp/xyz890", separator, false, cols)
-      sdf.sqlContext.sparkContext.textFile("/tmp/xyz890")
-    }
+  def toCSV(separator: String = ",", cols: Seq[String]) = {
+    val fileName = "/tmp/csvFile-" + System.currentTimeMillis().toString()
+    FileUtils.removeAll(fileName)
+    writeToCSV(fileName, separator, true, cols)
+    val rdd = sdf.sqlContext.sparkContext.textFile(fileName)
 
-    /**
-     * save the DF to a text file
-     * @param file save DF in this file
-     * @param separator use this separator, default is comma
-     * @param singlePart save to a single partition to allow easy transfer to non-HDFS storage
-     */
-    def writeToCSV(file: String,
-                   separator: String = ",",
-                   singlePart: Boolean = false,
-                   cols: Seq[String] = columnNames): Unit = {
-      sdf.select(cols.head, cols.tail: _*).write.format("com.databricks.spark.csv").option("header", "true").save(file)
+    rdd
+  }
+
+  /**
+   * save the DF to a text file
+   * @param file save DF in this file
+   * @param separator use this separator, default is comma
+   * @param singlePart save to a single partition to allow easy transfer to non-HDFS storage
+   */
+  def writeToCSV(file: String,
+                 separator: String = ",",
+                 singlePart: Boolean = false,
+                 cols: Seq[String] = columnNames): Unit = {
+    val dfToWrite = singlePart match {
+      case true => sdf.coalesce(1)
+      case _ => sdf
     }
+    new CsvSchemaRDD(dfToWrite).saveAsCsvFile(file, Map("delimiter" -> separator, "header" -> "true"))
+  }
 
   /**
    * save the DF to a parquet file.
@@ -231,26 +238,27 @@ case class DF private(var sdf: DataFrame,
    * somewhat expensive, don't use this if count of NAs per column suffices
    */
   def countRowsWithNA = {
-    //    rowsRddCached = None //fillNA could have mutated columns, recalculate rows
-    //    val x = rowsRdd.map { row => if (CountHelper.countNaN(row) > 0) 1 else 0 }
-    //    x.reduce {
-    //      _ + _
-    //    }
+    sdf.rdd.filter(_.anyNull).count
   }
 
   /**
    * number of columns that have NA
    */
   def countColsWithNA = {
-    //    columns().map { col => if (col.hasNA) 1 else 0 }.reduce { _ + _ }
+    columns(0 until columnCount).map { col => if (col.hasNA) 1 else 0 }.sum
   }
 
   /**
    * drops all rows that have NAs
    */
-  def dropNA(): Unit = { sdf = sdf.na.drop() }
+  def dropNA(): Unit = {
+    sdf = sdf.na.drop()
+  }
 
-  def fillNA(fillValues: Map[String, Any]) = { sdf = sdf.na.fill(fillValues) }
+  def fillNA(fillValues: Map[String, Any]) = {
+    sdf = sdf.na.fill(fillValues)
+  }
+
   /**
    * aggregate one column after grouping by another
    * @param aggByCol the column to group by
@@ -273,7 +281,7 @@ case class DF private(var sdf: DataFrame,
    */
   def aggregate(aggByCols: Seq[String],
                 aggdCols: Map[String, String]): DF = {
-    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail:_*).agg(aggdCols)
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdCols)
     new DF(aggdSdf, options, s"aggd:$name")
   }
 
@@ -295,7 +303,9 @@ case class DF private(var sdf: DataFrame,
     name = sdf.columns(colIndex),
     df = Some(this))
 
-  def delete(colName: String): Unit = { sdf = sdf.drop(colName) }
+  def delete(colName: String): Unit = {
+    sdf = sdf.drop(colName)
+  }
 
   /**
    * group by using given columns as key
@@ -305,7 +315,7 @@ case class DF private(var sdf: DataFrame,
   /**
    * print brief description of the DF
    */
-  def describe(colNames: String*) = sdf.describe(colNames:_*)
+  def describe(colNames: String*) = sdf.describe(colNames: _*)
 
   /**
    * print upto numRows x numCols elements of the dataframe
