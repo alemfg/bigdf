@@ -5,75 +5,8 @@
  */
 package com.ayasdi.bigdf
 
-import scala.collection.immutable.HashSet
-
 import org.apache.spark.storage.StorageLevel
-
-/**
- * Action to take when malformed lines are found in a CSV File
- */
-object LineExceptionPolicy {
-
-  sealed trait EnumVal
-
-  /**
-   * ignore the malformed line and continue
-   */
-  case object Ignore extends EnumVal
-
-  /**
-   * stop parsing and abort
-   */
-  case object Abort extends EnumVal
-
-  /**
-   * if fields are missing in a line, fill in the blanks
-   */
-  case object Fill extends EnumVal
-
-}
-
-
-/**
- * Options to control parsing of numbers
- * @param emptyStringReplace replace empty string with this string
- * @param nanStrings these strings are NaNs
- * @param nanValue this is the value to use for NaN
- * @param enable make this false to stop attempting to parse numbers i.e. treat them as strings
- */
-case class NumberParsingOpts(val emptyStringReplace: String = "NaN",
-                             val nanStrings: Set[String] = HashSet("NaN", "NULL", "N/A"),
-                             val nanValue: Double = Double.NaN,
-                             val enable: Boolean = true)
-
-/**
- * Options to control parsing of strings
- * @param emptyStringReplace replace empty string with this string
- */
-case class StringParsingOpts(val emptyStringReplace: String = "")
-
-/**
- * options to handle exceptions while parsing a line
- * @param badLinePolicy abort, ignore line or fill with nulls when a bad line is encountered
- * @param fillValue if line exception policy is to fill in the blanks, use this value to fill
- */
-case class LineParsingOpts(val badLinePolicy: LineExceptionPolicy.EnumVal = LineExceptionPolicy.Ignore,
-                           val fillValue: String = "")
-
-/**
- * CSV parsing options
- * @param quoteChar fields containing delimiters, other special chars are quoted using this character
- *                  e.g. "this is a comma ,"
- * @param escapeChar if a quote character appears in a field, it is escaped using this
- *                   e.g. "this is a quote \""
- * @param ignoreLeadingWhitespace ignore white space before a field
- * @param ignoreTrailingWhiteSpace ignore white space after a field
- */
-case class CSVParsingOpts(val delimiter: Char = ',',
-                          val quoteChar: Char = '"',
-                          val escapeChar: Char = '\\',
-                          val ignoreLeadingWhitespace: Boolean = true,
-                          val ignoreTrailingWhiteSpace: Boolean = true)
+import com.databricks.spark.csv.{CSVParsingOpts, LineParsingOpts, StringParsingOpts, NumberParsingOpts}
 
 /**
  *

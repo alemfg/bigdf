@@ -12,6 +12,7 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.{SparkException, SparkConf, SparkContext}
 import com.ayasdi.bigdf.Implicits._
+import com.databricks.spark.csv.{LineExceptionPolicy, LineParsingOpts}
 
 class DFTest extends FunSuite with BeforeAndAfterAll {
   implicit var sc: SparkContext = _

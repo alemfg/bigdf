@@ -6,7 +6,7 @@ package com.ayasdi.bigdf.readers
 
 import com.univocity.parsers.csv._
 
-import com.ayasdi.bigdf.LineExceptionPolicy
+import com.databricks.spark.csv.LineExceptionPolicy
 
 abstract class CsvReader(fieldSep: Char = ',',
                          lineSep: String = "\n",

@@ -14,6 +14,8 @@ import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.{Accumulator, SparkContext}
 import com.ayasdi.bigdf.readers.{BulkCsvReader, LineCsvReader}
 
+import com.databricks.spark.csv.{NumberParsingOpts, StringParsingOpts, CSVParsingOpts}
+
 object SchemaUtils {
 
   /**
@@ -104,7 +106,7 @@ object SchemaUtils {
     val firstLine = file.first
     val header = new LineCsvReader(fieldSep = options.csvParsingOpts.delimiter,
       ignoreLeadingSpace = options.csvParsingOpts.ignoreLeadingWhitespace,
-      ignoreTrailingSpace = options.csvParsingOpts.ignoreTrailingWhiteSpace,
+      ignoreTrailingSpace = options.csvParsingOpts.ignoreTrailingWhitespace,
       quote = options.csvParsingOpts.quoteChar,
       escape = options.csvParsingOpts.escapeChar
     ).parseLine(firstLine)
@@ -119,7 +121,7 @@ object SchemaUtils {
         new BulkCsvReader(iter, split,
           fieldSep = options.csvParsingOpts.delimiter,
           ignoreLeadingSpace = options.csvParsingOpts.ignoreLeadingWhitespace,
-          ignoreTrailingSpace = options.csvParsingOpts.ignoreTrailingWhiteSpace,
+          ignoreTrailingSpace = options.csvParsingOpts.ignoreTrailingWhitespace,
           quote = options.csvParsingOpts.quoteChar,
           escape = options.csvParsingOpts.escapeChar,
           numFields = header.size,

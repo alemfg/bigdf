@@ -395,7 +395,7 @@ object DF {
       .withEscape(options.csvParsingOpts.escapeChar)
       .withQuoteChar(options.csvParsingOpts.quoteChar)
       .withIgnoreLeadingWhiteSpace(options.csvParsingOpts.ignoreLeadingWhitespace)
-      .withIgnoreTrailingWhiteSpace(options.csvParsingOpts.ignoreTrailingWhiteSpace)
+      .withIgnoreTrailingWhiteSpace(options.csvParsingOpts.ignoreTrailingWhitespace)
       .withSchema(inferredSchema)
       .withParseMode("PERMISSIVE")
       .withParserLib("UNIVOCITY")
