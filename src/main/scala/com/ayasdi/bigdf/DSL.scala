@@ -24,14 +24,14 @@ object Implicits {
 
 case class RichDF(self: DF) extends Dynamic {
   /**
-   * get a column identified by name
+   * get a column identified by its name
    * @param colName name of the column
    */
   def apply(colName: String) = self.column(colName)
 
   /**
-   * get a column with given index
-   * @param index column index
+   * get a column by its numeric index
+   * @param index index of the column
    * @return
    */
   def apply(index: Int): Column = self.column(index)
@@ -58,6 +58,7 @@ case class RichDF(self: DF) extends Dynamic {
 
   /**
    * filter by a predicate
+   * @param cond see [[http://spark.apache.org/docs/1.4.0/api/java/org/apache/spark/sql/DataFrame.html#filter(org.apache.spark.sql.Column)]]
    */
   def apply(cond: SColumn) = self.where(cond)
 
@@ -69,7 +70,7 @@ case class RichDF(self: DF) extends Dynamic {
   }
 
   /**
-   * update a column "c" of DF "df" like df.c = .. equivalent df("c") = ...
+   * update a column "c" of DF "df" like df.c = ... equivalent df("c") = ...
    */
   def updateDynamic(colName: String)(that: Column) = update(colName, that)
 }

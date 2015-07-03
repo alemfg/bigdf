@@ -215,50 +215,38 @@ class Column private[bigdf](var scol: SColumn,
   /**
    * add a number to a column
    */
-  def +(that: Double) = new Column(scol + that)
+  def +(that: Any) = new Column(scol + that)
 
   /**
    * subtract a number from a column
    */
-  def -(that: Double) = new Column(scol - that)
+  def -(that: Any) = new Column(scol - that)
 
   /**
    * divide a column by a number
    */
-  def /(that: Double) = new Column(scol / that)
+  def /(that: Any) = new Column(scol / that)
 
   /**
    * multiply a column with a number
    */
-  def *(that: Double) = new Column(scol * that)
+  def *(that: Any) = new Column(scol * that)
 
   def ===(that: Column) = scol === that.scol
 
-  def ===(that: Double) = scol === that
+  def ===(that: Any) = scol === that
 
   def !==(that: Column) = scol !== that.scol
 
-  def !==(that: Double) = scol !== that
+  def !==(that: Any) = scol !== that
 
-  def >=(that: Double) = scol >= that
+  def >=(that: Any) = scol >= that
 
-  def <(that: Double) = scol < that
+  def <(that: Any) = scol < that
 
-  def >(that: Double) = scol > that
+  def >(that: Any) = scol > that
 
-  def <=(that: Double) = scol <= that
-
-  def ===(that: String) = scol === that
-
-  def !==(that: String) = scol !== that
-
-  def >=(that: String) = scol >= that
-
-  def <(that: String) = scol < that
-
-  def >(that: String) = scol > that
-
-  def <=(that: String) = scol <= that
+  def <=(that: Any) = scol <= that
 
   /**
    * apply a given function to a column to generate a new column

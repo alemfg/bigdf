@@ -97,7 +97,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
       options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Fill)))
     df.list()
-//    assert(df.columnCount === 3)
+    assert(df.columnCount === 3)
 //    assert(df.rowCount === 8)
   }
 
