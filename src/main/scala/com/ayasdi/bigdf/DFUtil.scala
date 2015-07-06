@@ -141,6 +141,7 @@ object SparkUtil {
     else if (tpe =:= ru.typeOf[String]) StringType
     else if (tpe =:= ru.typeOf[Long]) LongType
     else if (tpe =:= ru.typeOf[Short]) ShortType
+    else if (tpe =:= ru.typeOf[Array[String]]) ArrayType(StringType)
     else throw new IllegalArgumentException(s"Type not supported: $tpe")
 
   def typeTagToClassTag[V: ru.TypeTag] = {
