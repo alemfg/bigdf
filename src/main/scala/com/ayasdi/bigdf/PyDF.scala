@@ -21,9 +21,23 @@ import com.ayasdi.bigdf.Implicits._
 case class PyDF(df: DF) {
   def columnNames = df.columnNames
 
+  def column(name: String) = PyColumn(df.column(name))
+
+  def columnByIndex(index: Int) = PyColumn(df.column(index))  
+
+  def deleteColumn(colName: String) = df.delete(colName)
+
+  def colCount = df.columnCount
+
+  def rowCount = df.rowCount
+  
+  def rowsByRange(start: Int, end: Int) = {
+    val r = Range(start, end)
+    PyDF(df.rowsByRange(r))
+  }
+
   def rename(columns: JHashMap[String, String], inPlace: Boolean) =
     df.rename(columns.toMap, inPlace)
-  def column(name: String) = PyColumn(df.column(name))
 
   def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)
 
@@ -35,9 +49,8 @@ case class PyDF(df: DF) {
     df.update(name, pycol.col)
   }
 
-  def rowCount = df.rowCount
-
-  def colCount = df.columnCount
+  def compareSchema(a: PyDF, b: PyDF) =
+    DF.compareSchema(a.df, b.df)
 
   def join(sc: SparkContext, left: PyDF, right: PyDF, on: String, how: String) = {
     val joinType = how match {
@@ -76,6 +89,7 @@ case class PyDF(df: DF) {
   def writeToCSV(file: String, separator: String, singlePart: Boolean,
     cols: JArrayList[String]): Unit =
     df.writeToCSV(file, separator, singlePart, cols.asScala.toList)
+
   def writeToParquet(file: String, cols: JArrayList[String]): Unit =
     df.writeToParquet(file, cols.asScala.toList)
 
