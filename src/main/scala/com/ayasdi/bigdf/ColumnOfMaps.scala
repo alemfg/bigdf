@@ -10,6 +10,9 @@ import java.util.{HashSet => JHashSet}
 import scala.collection.JavaConversions.asScalaSet
 import scala.collection.mutable
 
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{FloatType, StringType, MapType}
+
 class RichColumnMaps[K, V](self: Column) {
 
   def expand(df: DF, keys: Set[String] = null, namePrefix: String = "expanded_"): Unit = {
@@ -19,14 +22,11 @@ class RichColumnMaps[K, V](self: Column) {
       self.mapOfStringToFloatRdd
         .aggregate(AggDistinctKeys.zeroVal)(AggDistinctKeys.seqOp, AggDistinctKeys.combOp)
     }
+
     ks.foreach { k =>
-      val newColRdd = self.mapOfStringToFloatRdd.map { sparse =>
-        sparse.getOrElse(k, 0.0F).toDouble
-      }
-      newColRdd.name = s"expanded_${k}"
-      newColRdd.cache()
-      val newCol = Column(newColRdd)
-      df.setColumn(s"${namePrefix}${k}", newCol)
+      val sparseToDense = (sparse: Map[String, Float]) => sparse.getOrElse(k, 0.0F)
+      val newCol = callUDF(sparseToDense, FloatType, self.df.get.sdf.col(self.name))
+      self.df.get.sdf = self.df.get.sdf.withColumn(s"${namePrefix}${k}", newCol)
     }
   }
 
@@ -35,7 +35,7 @@ class RichColumnMaps[K, V](self: Column) {
 case object AggDistinctKeys {
   def zeroVal: mutable.Set[String] = new JHashSet[String]
 
-  def seqOp(a: mutable.Set[String], b: mutable.Map[String, Float]) = a ++= b.keySet
+  def seqOp(a: mutable.Set[String], b: Map[String, Float]) = a ++= b.keySet
 
   def combOp(a: mutable.Set[String], b: mutable.Set[String]) = a ++= b
 }

@@ -456,6 +456,10 @@ object DF {
         case c: String =>
           println(s"Column: ${colName} Type: String")
           StructField(colName, StringType)
+
+        case cs: Array[String] =>
+          println(s"Column: $colName Type: Array[String]")
+          StructField(colName, ArrayType(StringType))
       }
     }
 

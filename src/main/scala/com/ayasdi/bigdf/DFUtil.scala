@@ -7,6 +7,7 @@ package com.ayasdi.bigdf
 
 import java.io.File
 
+import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.reflect.runtime.{universe => ru}
 
@@ -138,11 +139,14 @@ object SparkUtil {
   }
 
   def typeTagToSql(tpe: ru.Type) = if (tpe =:= ru.typeOf[Double]) DoubleType
-    else if (tpe =:= ru.typeOf[String]) StringType
-    else if (tpe =:= ru.typeOf[Long]) LongType
-    else if (tpe =:= ru.typeOf[Short]) ShortType
-    else if (tpe =:= ru.typeOf[Array[String]]) ArrayType(StringType)
-    else throw new IllegalArgumentException(s"Type not supported: $tpe")
+  else if (tpe =:= ru.typeOf[Float]) FloatType
+  else if (tpe =:= ru.typeOf[String]) StringType
+  else if (tpe =:= ru.typeOf[Long]) LongType
+  else if (tpe =:= ru.typeOf[Short]) ShortType
+  else if (tpe =:= ru.typeOf[Array[String]]) ArrayType(StringType)
+  else if (tpe =:= ru.typeOf[Map[String, Float]]) MapType(StringType, FloatType)
+  else if (tpe =:= ru.typeOf[mutable.Map[String, Float]]) MapType(StringType, FloatType)
+  else throw new IllegalArgumentException(s"Type not supported: $tpe")
 
   def typeTagToClassTag[V: ru.TypeTag] = {
     val mirror = ru.runtimeMirror(getClass.getClassLoader)

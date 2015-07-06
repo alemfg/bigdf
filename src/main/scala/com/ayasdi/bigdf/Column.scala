@@ -179,7 +179,7 @@ class Column private[bigdf](var scol: SColumn,
   /**
    * get rdd of map from string to float for things like tfidf values of terms
    */
-  def mapOfStringToFloatRdd = getRdd[mutable.Map[String, Float]]
+  def mapOfStringToFloatRdd = getRdd[Map[String, Float]]
 
   /**
    * get the RDD typecast to the given type
@@ -189,7 +189,7 @@ class Column private[bigdf](var scol: SColumn,
   def getRdd[R: ru.TypeTag] = {
     require(SparkUtil.typeTagToSql(ru.typeOf[R]) == sqlType, s"s${ru.typeOf[R]} does not match s${sqlType}")
     require(!df.isEmpty)
-    df.get.sdf.select(name).rdd.map(_(0)).asInstanceOf[RDD[R]]
+    df.get.sdf.select(name).rdd.map(_(0).asInstanceOf[R])(SparkUtil.typeTagToClassTag[R])
   }
 
   /**
