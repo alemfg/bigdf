@@ -74,6 +74,7 @@ case class PyDF(df: DF) {
         }
       }
       case "StrJoin" => df.aggregate(byColumn, aggrColumn, new AggMakeString(","))
+      case "StrList" => df.aggregate(byColumn, aggrColumn, AggArrayString)
       case _ => null
     }
     PyDF(dfAgg)
@@ -116,6 +117,7 @@ object PyDF {
 
 case class PyColumn[+T: ru.TypeTag](col: Column[T]) {
   def list(numRows: Int) = col.list(numRows)
+  def head(numRows: Int) = col.head(numRows)  
 
   override def toString = {
     val name = s"${col.rdd.name}".split('/').last.split('.').head
