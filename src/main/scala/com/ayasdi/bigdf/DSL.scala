@@ -58,7 +58,8 @@ case class RichDF(self: DF) extends Dynamic {
 
   /**
    * filter by a predicate
-   * @param cond see [[http://spark.apache.org/docs/1.4.0/api/java/org/apache/spark/sql/DataFrame.html#filter(org.apache.spark.sql.Column)]]
+   * @param cond see [[http://spark.apache.org/docs/1.4.0/api/java/org/apache/spark/sql/DataFrame.html
+   *             #filter(org.apache.spark.sql.Column)]]
    */
   def apply(cond: SColumn) = self.where(cond)
 

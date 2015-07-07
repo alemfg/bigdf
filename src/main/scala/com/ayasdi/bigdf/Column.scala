@@ -10,6 +10,7 @@ import java.util.{HashMap => JHashMap}
 
 import scala.collection.JavaConversions.mapAsScalaMap
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.{ClassTag, classTag}
 
@@ -169,12 +170,17 @@ class Column private[bigdf](var scol: SColumn,
   /**
    * get rdd of array of strings to do text analysis
    */
-  def arrayOfStringRdd = getRdd[Array[String]]
+  def arrayOfStringRdd = getRdd[ArrayBuffer[String]]
 
   /**
    * get rdd of array of doubles
    */
-  def arrayOfDoubleRdd = getRdd[Array[Double]]
+  def arrayOfDoubleRdd = getRdd[ArrayBuffer[Double]]
+
+  /**
+   * get rdd of array of doubles
+   */
+  def arrayOfFloatRdd = getRdd[ArrayBuffer[Float]]
 
   /**
    * get rdd of map from string to float for things like tfidf values of terms
@@ -187,7 +193,7 @@ class Column private[bigdf](var scol: SColumn,
    * @return RDD of R's. throws exception if the cast is not applicable to this column
    */
   def getRdd[R: ru.TypeTag] = {
-    require(SparkUtil.typeTagToSql(ru.typeOf[R]) == sqlType, s"s${ru.typeOf[R]} does not match s${sqlType}")
+    require(SparkUtil.typeTagToSql(ru.typeOf[R]) == sqlType, s"${ru.typeOf[R]} does not match ${sqlType}")
     require(!df.isEmpty)
     df.get.sdf.select(name).rdd.map(_(0).asInstanceOf[R])(SparkUtil.typeTagToClassTag[R])
   }
