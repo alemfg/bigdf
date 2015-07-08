@@ -24,6 +24,7 @@ case class PyDF(df: DF) {
 
   def rename(columns: JHashMap[String, String], inPlace: Boolean) =
     df.rename(columns.toMap, inPlace)
+
   def column(name: String) = PyColumn(df.column(name))
 
   def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)

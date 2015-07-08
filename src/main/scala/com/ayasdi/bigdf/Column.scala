@@ -12,9 +12,9 @@ import scala.collection.JavaConversions.mapAsScalaMap
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.{universe => ru}
-import scala.reflect.{ClassTag, classTag}
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column => SColumn, Row, SQLContext, SparkColumnFunctions}
@@ -60,6 +60,7 @@ class Column private[bigdf](var scol: SColumn,
                             var index: Int = -1,
                             var name: String = "anon",
                             var df: Option[DF] = None) {
+
   /**
    * set names for categories
    * FIXME: this should be somewhere else not in Column
@@ -263,32 +264,13 @@ class Column private[bigdf](var scol: SColumn,
     val newCol = callUDF(mapper, SparkUtil.typeTagToSql(ru.typeOf[V]), df.get.sdf(name))
     new Column(newCol)
   }
-
-  def dbl_map[U: ClassTag](mapper: Double => U) = {
-    val mapped = if (isDouble) {
-      doubleRdd.map { row => mapper(row) }
-    } else null
-    if (classTag[U] == classTag[Double])
-      Column(mapped.asInstanceOf[RDD[Double]])
-    else if (classTag[U] == classTag[String])
-      Column(mapped.asInstanceOf[RDD[String]])
-    else null
-  }
-
-  def str_map[U: ClassTag](mapper: String => U) = {
-    val mapped = if (isString) {
-      stringRdd.map { row => mapper(row) }
-    } else null
-    if (classTag[U] == classTag[Double])
-      Column(mapped.asInstanceOf[RDD[Double]])
-    else if (classTag[U] == classTag[String])
-      Column(mapped.asInstanceOf[RDD[String]])
-    else null
-  }
-
 }
 
 object Column {
+  import scala.language.implicitConversions
+  implicit def column2SparkColumnFunctions(col: Column): SparkColumnFunctions = new SparkColumnFunctions(col.scol)
+  implicit def column2Expr(col: Column): Expression = new SparkColumnFunctions(col.scol).expr
+
   /**
    * create Column from existing RDD
    */

@@ -10,7 +10,11 @@ import java.nio.file.{Files, Paths}
 
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
-import org.apache.spark.{SparkException, SparkConf, SparkContext}
+import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.trees
+import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.{Column => SColumn, SparkColumnFunctions}
+import org.apache.spark.{SparkConf, SparkContext, SparkException}
 import com.ayasdi.bigdf.Implicits._
 import com.databricks.spark.csv.{LineExceptionPolicy, LineParsingOpts}
 
@@ -414,8 +418,15 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df3("new2").doubleRdd.collect() === rdd.collect())
   }
 
-//  test("Aggregate") {
-//    val df = makeDF
+  test("Aggregate") {
+    val df = makeDF
+    df("groupByThis") = df("a").map[Double, Double] { x => 1.0 }
+    val minOfA = df.aggregate(List("groupByThis"), MyMin(df("a")))
+
+    df.list()
+    minOfA.list()
+
+    assert(minOfA.sdf.first().get(1) === df("a").doubleRdd.collect.min)
 //    df("groupByThis") = df("a").dbl_map { x => 1.0 }
 //
 //    val sumOfA = df.aggregate("groupByThis", "a", AggSimple)
@@ -434,7 +445,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 //    assert(stats("Max") === 13.0)
 //    assert(stats("Min") === 11.0)
 //    assert(math.abs(stats("Variance") - 0.6666667) < 0.1)
-//  }
+  }
 //
 //  test("Aggregate multi") {
 //    val df = makeDFFromCSVFile("src/test/resources/aggregate.csv")
@@ -508,10 +519,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
 class DFTestWithKryo extends DFTest {
   override def beforeAll {
-    SparkUtil.silenceSpark
+    SparkUtil.silenceSpark()
     System.clearProperty("spark.master.port")
 
-    var conf = new SparkConf()
+    val conf = new SparkConf()
       .setMaster("local[4]")
       .setAppName("DFTestWithKryo")
       .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
@@ -519,8 +530,35 @@ class DFTestWithKryo extends DFTest {
   }
 }
 
-case object AggSimple extends Aggregator[Double, Double, Double] {
-  def aggregate(a: Double, b: Double) = a + b
+
+case class MyMin(child: Expression) extends PartialAggregate with trees.UnaryNode[Expression] {
+  override def nullable: Boolean = true
+  override def dataType: DataType = child.dataType
+  override def toString: String = s"MYMIN($child)"
+
+  override def asPartial: SplitEvaluation = {
+    val partialMin = Alias(MyMin(child), "MyPartialMin")()
+    SplitEvaluation(Min(partialMin.toAttribute), partialMin :: Nil)
+  }
+
+  override def newInstance(): MyMinFunction = new MyMinFunction(child, this)
+}
+
+case class MyMinFunction(expr: Expression, base: AggregateExpression) extends AggregateFunction {
+  def this() = this(null, null) // Required for serialization.
+
+  val currentMin: MutableLiteral = MutableLiteral(null, expr.dataType)
+  val cmp = GreaterThan(currentMin, expr)
+
+  override def update(input: Row): Unit = {
+    if (currentMin.value == null) {
+      currentMin.value = expr.eval(input)
+    } else if (cmp.eval(input) == true) {
+      currentMin.value = expr.eval(input)
+    }
+  }
+
+  override def eval(input: Row): Any = currentMin.value
 }
 
 case object AggCustom extends Aggregator[Double, Array[Double], Double] {

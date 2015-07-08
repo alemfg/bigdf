@@ -9,6 +9,7 @@ import scala.collection.immutable.Range.Inclusive
 import scala.reflect.runtime.{universe => ru}
 
 import org.apache.spark.SparkContext
+import org.apache.spark.sql.catalyst.expressions.AggregateExpression
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column => SColumn, _}
 import org.apache.spark.storage.StorageLevel
@@ -270,6 +271,11 @@ class DF private(var sdf: DataFrame,
                                                              aggdCol: String,
                                                              aggtor: String): DF = {
     aggregate(List(aggByCol), Map(aggdCol -> aggtor))
+  }
+
+  def aggregate(aggByCols: Seq[String], aggdExpr: AggregateExpression) = {
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(SparkColumnFunctions(aggdExpr))
+    new DF(aggdSdf, options, s"aggd:$name")
   }
 
 
