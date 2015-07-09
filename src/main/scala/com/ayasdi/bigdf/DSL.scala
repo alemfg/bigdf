@@ -15,7 +15,7 @@ import org.apache.spark.sql.{Column => SColumn}
 object Implicits {
   import scala.language.implicitConversions
 
-  implicit def columnAnyToRichColumnMap(col: Column) = new RichColumnMaps(col)
+  implicit def columnAnyToRichColumnMap(col: Column) = new SparseColumnFunctions(col)
 
   implicit def columnSeqToRichColumnSeq(cols: Seq[Column]) = new RichColumnSeq(cols)
 

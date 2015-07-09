@@ -13,7 +13,7 @@ import scala.collection.mutable
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{FloatType, StringType, MapType}
 
-class RichColumnMaps[K, V](self: Column) {
+class SparseColumnFunctions[K, V](self: Column) {
 
   def expand(df: DF, keys: Set[String] = null, namePrefix: String = "expanded_"): Unit = {
     require(self.colType == ColType.MapOfStringToFloat) //TODO: support can be added for others

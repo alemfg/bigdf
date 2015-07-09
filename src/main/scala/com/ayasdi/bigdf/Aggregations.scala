@@ -16,35 +16,6 @@ import org.apache.spark.sql.catalyst.trees
 import org.apache.spark.sql.types.{LongType, MapType}
 
 /**
- * 
- */
-//case class Frequency(child: Expression) extends AggregateExpression {
-//  override def nullable = true
-//
-//  override def children: Seq[Expression] = child :: Nil
-//
-//  override def dataType = MapType(child.dataType, LongType)
-//
-//  override def toString = s"TF($child)"
-//
-//  override def newInstance() = SparseSumFunction(child, this)
-//}
-//
-//case class FrequencyFunction(expr: Expression, base: AggregateExpression) extends AggregateFunction {
-//
-//  def this() = this(null, null) // Required for serialization.
-//
-//  val tfs: mutable.Map[Any, Long] = new JHashMap[Any, Long]()
-//
-//  override def update(input: Row): Unit = {
-//    val t = expr.eval(input)
-//    tfs(t) = tfs.getOrElse(t, 0L) + 1L
-//  }
-//
-//  override def eval(input: Row): Any = tfs
-//}
-
-/**
  * Aggregates frequencies of grouped items into a Map of item to count
  * e.g. Frequency(a, a, b, c, c, c) => (a -> 2, b -> 1, c -> 3)
  */

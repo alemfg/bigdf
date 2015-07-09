@@ -42,6 +42,9 @@ object ColType {
 
   case object ArrayOfDouble extends EnumVal
 
+  /**
+   * Often used to compress multiple logical columns into a single physical column
+   */
   case object MapOfStringToFloat extends EnumVal
 
   case object Undefined extends EnumVal
