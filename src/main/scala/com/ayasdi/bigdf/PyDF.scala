@@ -23,6 +23,9 @@ case class PyDF(df: DF) {
 
   def column(name: String) = PyColumn(df.column(name))
 
+  def expandMapColumn(name: String, namePrefix: String) =
+    df.column(name).expand(df, null, namePrefix)
+  
   def columnByIndex(index: Int) = PyColumn(df.column(index))  
 
   def deleteColumn(colName: String) = df.delete(colName)
