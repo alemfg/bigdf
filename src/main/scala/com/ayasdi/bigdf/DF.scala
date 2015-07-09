@@ -6,6 +6,7 @@
 package com.ayasdi.bigdf
 
 import scala.collection.immutable.Range.Inclusive
+import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 
 import org.apache.spark.SparkContext
@@ -278,15 +279,13 @@ class DF private(var sdf: DataFrame,
     new DF(aggdSdf, options, s"aggd:$name")
   }
 
-
   /**
    * aggregate multiple columns after grouping by multiple other columns
    * @param aggByCols sequence of columns to group by
    * @param aggdCols map of columns to be aggregated and their aggregation functions
    * @return new DF with first column aggByCol and second aggedCol
    */
-  def aggregate(aggByCols: Seq[String],
-                aggdCols: Map[String, String]): DF = {
+  def aggregate(aggByCols: Seq[String], aggdCols: Map[String, String]): DF = {
     val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdCols)
     new DF(aggdSdf, options, s"aggd:$name")
   }
@@ -328,6 +327,15 @@ class DF private(var sdf: DataFrame,
    */
   def list(numRows: Int = 10, numCols: Int = 10): Unit = sdf.show(numRows)
 
+  /**
+   * get the first few rows
+   */
+  def head(numRows: Int = 10) = sdf.head(numRows)
+
+  /**
+   * get the first row
+   */
+  def first() = sdf.first()
 }
 
 object DF {
@@ -466,6 +474,21 @@ object DF {
         case cs: Array[String] =>
           println(s"Column: $colName Type: Array[String]")
           StructField(colName, ArrayType(StringType))
+
+        case kvs: mutable.Map[_, _] =>
+          println(s"Column: $colName Type: Map[_, _]")
+          val kType = kvs.head._1 match {
+            case _: String => StringType
+            case _ => throw new IllegalArgumentException("not supported yet")
+          }
+          val vType = kvs.head._2 match {
+            case _: Long => LongType
+            case _: Int => IntegerType
+            case _: Double => DoubleType
+            case _: Float => FloatType
+            case _ => throw new IllegalArgumentException("not supported yet")
+          }
+          StructField(colName, MapType(kType, vType))
       }
     }
 

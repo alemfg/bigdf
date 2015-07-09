@@ -8,12 +8,14 @@ package com.ayasdi.bigdf
 
 import java.nio.file.{Files, Paths}
 
+import scala.collection.mutable
+
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.trees
 import org.apache.spark.sql.types.DataType
-import org.apache.spark.sql.{Column => SColumn, SparkColumnFunctions}
+import org.apache.spark.sql.{Column => SColumn}
 import org.apache.spark.{SparkConf, SparkContext, SparkException}
 import com.ayasdi.bigdf.Implicits._
 import com.databricks.spark.csv.{LineExceptionPolicy, LineParsingOpts}
@@ -55,7 +57,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       Vector("b1", "NULL", "b3"),
       Vector(31.0, 32.0, 33.0),
       Vector(1.36074391383E12, 1.360616948975E12, 1.36055080601E12))
-    DF(sc, h, v, "makeDFWithNAs", Options())
+    DF(sc, h, v, "makeDFWithNulls", Options())
   }
 
   private[bigdf] def makeDFWithString = {
@@ -64,7 +66,16 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       Vector(21.0, 22.0, 23.0),
       Vector(31.0, 32.0, 33.0),
       Vector(1.36074391383E12, 1.360616948975E12, 1.36055080601E12))
-    DF(sc, h, v, "makeDFWithNAs", Options())
+    DF(sc, h, v, "makeDFWithString", Options())
+  }
+
+  private[bigdf] def makeDFWithSparseCols = {
+    val h = Vector("a", "b", "c", "Sparse")
+    val v = Vector(Vector("11.0", "12.0", "13.0"),
+      Vector(21.0, 22.0, 23.0),
+      Vector(31.0, 32.0, 33.0),
+      Vector(mutable.Map("a" -> 1L), mutable.Map("a" -> 2L, "b" -> 0L), mutable.Map("b" -> 1L, "c" -> 10L)))
+    DF(sc, h, v, "makeDFWithSparseCols", Options())
   }
 
   private[bigdf] def makeDFFromCSVFile(file: String, options: Options = Options()) = {
@@ -103,14 +114,14 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Fill)))
     df.list()
     assert(df.columnCount === 3)
-//    assert(df.rowCount === 8)
+    //    assert(df.rowCount === 8)
   }
 
   test("Construct: DF from CSV file with missing fields, fill policy") {
     val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0, options = Options())
     df.list()
-//    assert(df.columnCount === 3)
-//    assert(df.rowCount === 2)
+    //    assert(df.columnCount === 3)
+    //    assert(df.rowCount === 2)
   }
 
   test("Construct: DF from CSV file with missing fields, abort policy") {
@@ -197,16 +208,17 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df4.columnNames === Array("aa", "bb", "c", "Date"))
   }
 
-  test("Parsing: Parse mixed doubles") { //FIXME: pass options to parser
-//    val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
-//    val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
-//    df.nameToColumn.foreach { col =>
-//      col._2.colType match {
-//        case ColType.Double => col._2.doubleRdd.collect
-//        case _ => null
-//      }
-//    }
-//    assert(df("Feature1").parseErrors.value === 1)
+  test("Parsing: Parse mixed doubles") {
+    //FIXME: pass options to parser
+    //    val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
+    //    val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
+    //    df.nameToColumn.foreach { col =>
+    //      col._2.colType match {
+    //        case ColType.Double => col._2.doubleRdd.collect
+    //        case _ => null
+    //      }
+    //    }
+    //    assert(df("Feature1").parseErrors.value === 1)
   }
 
   test("Delete a column") {
@@ -223,14 +235,14 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Parse doubles") {
-//    val df = DF(sc, "src/test/resources/doubles.csv", ',', 0, Options())
-//    assert(df("F1").isDouble)
-//    val parsed = df("F2").doubleRdd.collect()
-//    println(parsed.mkString(", "))
-//    assert(List(0, 2, 3, 4, 5, 6).forall {
-//      parsed(_).isNaN
-//    })
-//    assert(parsed(1) === 2.1)
+    //    val df = DF(sc, "src/test/resources/doubles.csv", ',', 0, Options())
+    //    assert(df("F1").isDouble)
+    //    val parsed = df("F2").doubleRdd.collect()
+    //    println(parsed.mkString(", "))
+    //    assert(List(0, 2, 3, 4, 5, 6).forall {
+    //      parsed(_).isNaN
+    //    })
+    //    assert(parsed(1) === 2.1)
   }
 
   test("Schema Dictate") {
@@ -240,26 +252,26 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Double to Categorical") {
-//    val df = makeDF
-//    val nCols = df.columnCount
-//    df("cat_a") = df("a").asCategorical
-//    df("cat_a").shortRdd.collect
-//    assert(df("cat_a").parseErrors.value === 0)
-//    assert(df.columnCount === nCols + 1)
+    //    val df = makeDF
+    //    val nCols = df.columnCount
+    //    df("cat_a") = df("a").asCategorical
+    //    df("cat_a").shortRdd.collect
+    //    assert(df("cat_a").parseErrors.value === 0)
+    //    assert(df.columnCount === nCols + 1)
   }
 
   test("Double to Categorical: errors") {
-//    val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
-//    val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
-//    df("cat_f1") = df("Feature1").asCategorical
-//    df("cat_f1").shortRdd.collect
-//    assert(df("cat_f1").parseErrors.value === 2)
+    //    val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
+    //    val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
+    //    df("cat_f1") = df("Feature1").asCategorical
+    //    df("cat_f1").shortRdd.collect
+    //    assert(df("cat_f1").parseErrors.value === 2)
   }
 
   test("Row index") {
-//    val df = makeDF
-//    val df2 = df.rowsByRange(1 until 2)
-//    assert(df2("a").doubleRdd.collect() === Array(12.0, 13.0))
+    //    val df = makeDF
+    //    val df2 = df.rowsByRange(1 until 2)
+    //    assert(df2("a").doubleRdd.collect() === Array(12.0, 13.0))
   }
 
   test("Filter/Select: Double Column comparisons with Scalar") {
@@ -312,8 +324,8 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(dfAeq12OrBeq23.rowCount === 2)
     val dfNotAeq12 = df(!(df("a") === 12))
     assert(dfNotAeq12.rowCount === 2)
-//    val dfAeq12XorBeq23 = df(df("a") === 12 ^^ df("b") === 23)
-//    assert(dfAeq12XorBeq23.rowCount === 2)
+    //    val dfAeq12XorBeq23 = df(df("a") === 12 ^^ df("b") === 23)
+    //    assert(dfAeq12XorBeq23.rowCount === 2)
   }
 
   test("NA: Counting NaNs") {
@@ -341,12 +353,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("NA: Marking a value as NA") {
-//    val df = makeDFWithNulls
-//    assert(df.countRowsWithNA === 0)
-//    df("a").markNA(-1.0)
-//    assert(df.countRowsWithNA === 1)
-//    df("b").markNA("NULL")
-//    assert(df.countRowsWithNA === 2)
+    //    val df = makeDFWithNulls
+    //    assert(df.countRowsWithNA === 0)
+    //    df("a").markNA(-1.0)
+    //    assert(df.countRowsWithNA === 1)
+    //    df("b").markNA("NULL")
+    //    assert(df.countRowsWithNA === 2)
   }
 
   test("Column Ops: New column as custom map of existing one") {
@@ -355,7 +367,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df("aPlus1") = df("a").map[Double, Double](x => x + 1.0)
     assert(df("aPlus1").doubleRdd.collect === Array(12.0, 13.0, 14.0))
 
-    df("aStr") = df("a").map[Double, String]{ x: Double => x.toString }
+    df("aStr") = df("a").map[Double, String] { x: Double => x.toString }
     assert(df("aStr").stringRdd.collect === Array("11.0", "12.0", "13.0"))
   }
 
@@ -394,31 +406,28 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df("new").doubleRdd.first === aa / 2)
   }
 
-  test("Column Ops: New column as custom function of existing ones - faster?") {
-//    val df = makeDF
-//    df("new") = RichColumnSeq(df("a", "b")).map(TestFunctions2.summer)
-//    assert(df("new").doubleRdd.first === 21 + 11)
-  }
-
-  test("DF from columns") {
+  test("Column Ops: New column as custom function of existing ones") {
     val df = makeDF
-    val colA = df("a")
-    colA.name = "a"
-    val df2 = DF.fromColumns(sc, List(colA), "fromCols2", Options())
-    assert(df2("a").doubleRdd.collect() === df("a").doubleRdd.collect())
+    df("new") = RichColumnSeq(df("a", "b")).map(TestFunctions2.summer _)
+    df.list()
+    df("new2") = RichColumnSeq(df("a", "b")).map { (x: Double, y: Double) => x + y }
 
-    val rdd = sc.parallelize(1 to 10).map(_.toDouble)
-    val col = Column(rdd)
-    df2("new") = col
-    assert(df2("new").doubleRdd.collect() === rdd.collect())
-
-    val col2 = Column(rdd)
-    col2.name = "new2"
-    val df3 = DF.fromColumns(sc, List(col2), "fromCols3", Options())
-    assert(df3("new2").doubleRdd.collect() === rdd.collect())
+    assert(df("new").doubleRdd.first === 21 + 11)
+    assert(df("new2").doubleRdd.first === 21 + 11)
   }
 
-  test("Aggregate") {
+  test("Aggregate: Catalyst") {
+    val df = makeDF
+    df("groupByThis") = df("a").map[Double, Double] { x => 1.0 }
+    val minOfA = df.aggregate(List("groupByThis"), Min(df("a")))
+
+    df.list()
+    minOfA.list()
+
+    assert(minOfA.sdf.first().get(1) === df("a").doubleRdd.collect().min)
+  }
+
+  test("Aggregate: Custom") {
     val df = makeDF
     df("groupByThis") = df("a").map[Double, Double] { x => 1.0 }
     val minOfA = df.aggregate(List("groupByThis"), MyMin(df("a")))
@@ -426,51 +435,52 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df.list()
     minOfA.list()
 
-    assert(minOfA.sdf.first().get(1) === df("a").doubleRdd.collect.min)
-//    df("groupByThis") = df("a").dbl_map { x => 1.0 }
-//
-//    val sumOfA = df.aggregate("groupByThis", "a", AggSimple)
-//    assert(sumOfA("a").doubleRdd.first === df("a").doubleRdd.sum)
-//
-//    val arrOfA = df.aggregate("groupByThis", "a", AggCustom)
-//    assert(arrOfA("a").doubleRdd.first === df("a").doubleRdd.sum)
-//
-//    val countOfA = df.aggregate("groupByThis", "a", AggCountDouble)
-//    assert(countOfA("a").doubleRdd.first() === 3)
-//
-//    val statsOfA = df.aggregate("groupByThis", "a", AggStats)
-//    statsOfA.list()
-//    val stats = statsOfA("a").mapOfStringToFloatRdd.first()
-//    assert(math.abs(stats("Mean") - 12.0) < 0.1)
-//    assert(stats("Max") === 13.0)
-//    assert(stats("Min") === 11.0)
-//    assert(math.abs(stats("Variance") - 0.6666667) < 0.1)
+    assert(minOfA.sdf.first().get(1) === df("a").doubleRdd.collect().min)
   }
-//
-//  test("Aggregate multi") {
-//    val df = makeDFFromCSVFile("src/test/resources/aggregate.csv")
-//    val sumOfFeature1 = df.aggregate(List("Month", "Customer"), List("Feature1"), AggSimple)
-//    assert(sumOfFeature1.columnCount === 3)
-//    assert(sumOfFeature1.rowCount === 4)
-//  }
-//
-//  test("Aggregate string") {
-//    val df = makeDFWithString
-//    df("groupByThis") = df("a").str_map(x => "hey")
-//    val arrOfA = df.aggregate("groupByThis", "a", new AggMakeString(sep = ";"))
-//    val strOfA = arrOfA("a").stringRdd.first
-//    assert(strOfA.contains("11.0") && strOfA.contains("12.0") && strOfA.contains("13.0"))
-//  }
 
-//  test("Pivot") {
-//    val df = makeDFFromCSVFile("src/test/resources/pivot.csv")
-//    df.list()
-//    val df2 = df.pivot("Customer", "Period")
-//    df2.describe()
-//    df2.list()
-//    assert(df2.rowCount === 3)
-//    assert(df2.columnCount === 5)
-//  }
+  test("Aggregate: multiple") {
+    val df = makeDFFromCSVFile("src/test/resources/aggregate.csv")
+    df.list()
+    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum", "Feature2" -> "Mean"))
+    aggd.list()
+    assert(aggd.columnCount === 4)
+    assert(aggd(aggd("Customer") === "Mohit Jaggi" && aggd("Month") === 2.0)
+      .first().get(2) === 9.0)
+    assert(aggd(aggd("Customer") === "Jack Jill" && aggd("Month") === 1.0)
+      .first().get(3) === 77.0)
+  }
+
+  test("Aggregate: SparseSum") {
+    val df = makeDFWithSparseCols
+    df.list()
+    df("groupByThis") = df("a").map[String, String](x => "hey")
+    df.list()
+    val aggd = df.aggregate(List("groupByThis"), SparseSum(df("Sparse")))
+    aggd.list()
+    println(aggd.first())
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("b").get === 1)
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("a").get === 3)
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("c").get === 10)
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("d").isEmpty)
+  }
+
+  test("Aggregate: Frequency") {
+    val df = makeDFWithString
+    df("groupByThis") = df("a").map[String, String](x => "hey")
+    df.list()
+    val tfs = df.aggregate(List("groupByThis"), Frequency(df("a")))
+    println(tfs.first())
+  }
+
+  //  test("Pivot") {
+  //    val df = makeDFFromCSVFile("src/test/resources/pivot.csv")
+  //    df.list()
+  //    val df2 = df.pivot("Customer", "Period")
+  //    df2.describe()
+  //    df2.list()
+  //    assert(df2.rowCount === 3)
+  //    assert(df2.columnCount === 5)
+  //  }
 
   test("Union") {
     val df1 = makeDF
@@ -530,15 +540,16 @@ class DFTestWithKryo extends DFTest {
   }
 }
 
-
 case class MyMin(child: Expression) extends PartialAggregate with trees.UnaryNode[Expression] {
   override def nullable: Boolean = true
+
   override def dataType: DataType = child.dataType
+
   override def toString: String = s"MYMIN($child)"
 
   override def asPartial: SplitEvaluation = {
     val partialMin = Alias(MyMin(child), "MyPartialMin")()
-    SplitEvaluation(Min(partialMin.toAttribute), partialMin :: Nil)
+    SplitEvaluation(MyMin(partialMin.toAttribute), partialMin :: Nil)
   }
 
   override def newInstance(): MyMinFunction = new MyMinFunction(child, this)
@@ -561,15 +572,6 @@ case class MyMinFunction(expr: Expression, base: AggregateExpression) extends Ag
   override def eval(input: Row): Any = currentMin.value
 }
 
-case object AggCustom extends Aggregator[Double, Array[Double], Double] {
-  override def convert(a: Double): Array[Double] = {
-    Array(a.asInstanceOf[Double])
-  }
-
-  def aggregate(a: Array[Double], b: Array[Double]) = a ++ b
-
-  override def finalize(x: Array[Double]) = x.sum
-}
 
 case object TestFunctions {
   def summer(cols: Array[Any]) = {
@@ -580,9 +582,6 @@ case object TestFunctions {
 }
 
 case object TestFunctions2 {
-  def summer(cols: Array[Any]) = {
-    println(cols(0), cols(1))
-    cols(0).asInstanceOf[Double] + cols(1).asInstanceOf[Double]
-  }
+  def summer(a1: Double, a2: Double) = a1 + a2
 }
 
