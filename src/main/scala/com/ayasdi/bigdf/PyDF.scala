@@ -35,15 +35,13 @@ case class PyDF(df: DF) {
 
   def rowCount = df.rowCount
   
-  def rowsByRange(start: Int, end: Int) = {
-    val r = Range(start, end)
-    PyDF(df.rowsByRange(r))
-  }
+  // def rowsByRange(start: Int, end: Int) = {
+  //   val r = Range(start, end)
+  //   PyDF(df.rowsByRange(r))
+  // }
 
   def rename(columns: JHashMap[String, String], inPlace: Boolean) =
     df.rename(columns.toMap, inPlace)
-
-  def column(name: String) = PyColumn(df.column(name))
 
   def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)
 
