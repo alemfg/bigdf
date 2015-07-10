@@ -13,8 +13,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{StructField, StructType}
 import org.apache.spark.{Accumulator, SparkContext}
 import com.ayasdi.bigdf.readers.{BulkCsvReader, LineCsvReader}
-
-import com.databricks.spark.csv.{NumberParsingOpts, StringParsingOpts, CSVParsingOpts}
+import com.databricks.spark.csv.NumberParsingOpts
 
 object SchemaUtils {
 
@@ -117,7 +116,7 @@ object SchemaUtils {
     }, true)
 
     val rows = dataLines.mapPartitionsWithIndex({
-      case (split, iter) => {
+      case (split, iter) =>
         new BulkCsvReader(iter, split,
           fieldSep = options.csvParsingOpts.delimiter,
           ignoreLeadingSpace = options.csvParsingOpts.ignoreLeadingWhitespace,
@@ -127,7 +126,7 @@ object SchemaUtils {
           numFields = header.size,
           badLinePolicy = options.lineParsingOpts.badLinePolicy,
           fillValue = options.lineParsingOpts.fillValue)
-      }
+
     }, true)
 
     val colName2Type = (for (i <- 0 until header.length) yield {

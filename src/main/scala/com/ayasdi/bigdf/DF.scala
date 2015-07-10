@@ -405,13 +405,10 @@ object DF {
     val inferredSchema = SchemaUtils.inferSchema(sc, inFile, schema, options)
 
     val sdf = new SParser().withUseHeader(true)
-      .withDelimiter(options.csvParsingOpts.delimiter)
-      .withEscape(options.csvParsingOpts.escapeChar)
-      .withQuoteChar(options.csvParsingOpts.quoteChar)
-      .withIgnoreLeadingWhiteSpace(options.csvParsingOpts.ignoreLeadingWhitespace)
-      .withIgnoreTrailingWhiteSpace(options.csvParsingOpts.ignoreTrailingWhitespace)
+      .withCsvParsingOpts(options.csvParsingOpts)
+      .withLineParsingOpts(options.lineParsingOpts)
+      .withNumberParsingOpts(options.numberParsingOpts)
       .withSchema(inferredSchema)
-      .withParseMode("PERMISSIVE")
       .withParserLib("UNIVOCITY")
       .csvFile(sqlContext, inFile)
 

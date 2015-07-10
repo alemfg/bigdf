@@ -109,19 +109,20 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df2.rowCount === 4)
   }
 
-  test("Construct: DF from CSV file with missing fields, ignore policy") {
+  test("Construct: DF from CSV file with missing fields, fill policy") {
     val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
       options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Fill)))
     df.list()
     assert(df.columnCount === 3)
-    //    assert(df.rowCount === 8)
+    assert(df.rowCount === 8)
   }
 
-  test("Construct: DF from CSV file with missing fields, fill policy") {
-    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0, options = Options())
+  test("Construct: DF from CSV file with missing fields, ignore policy") {
+    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
+      options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Ignore)))
     df.list()
-    //    assert(df.columnCount === 3)
-    //    assert(df.rowCount === 2)
+    assert(df.columnCount === 3)
+    assert(df.rowCount === 2)
   }
 
   test("Construct: DF from CSV file with missing fields, abort policy") {
