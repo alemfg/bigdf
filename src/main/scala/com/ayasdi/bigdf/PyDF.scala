@@ -116,10 +116,21 @@ object PyDF {
   }
 }
 
-case class PyColumn[+T: ru.TypeTag](col: Column) {
+case class PyColumn[T: ru.TypeTag](col: Column) {
   def list(numRows: Int) = col.list(numRows)
   def head(numRows: Int) = col.head(numRows)
   def count = col.count
+
+  def mean = col.mean()
+  def max = col.doubleRdd.max()
+  def min = col.doubleRdd.max()
+  def stddev = col.stdev()
+  def variance = col.variance()
+  def histogram(nBuckets: Int) = col.histogram(nBuckets)
+  def first = col.getRdd[T].first()
+  def distinct = col.getRdd[T].distinct()
+  def sum = col.sum()
+  def stats = col.stats()
 
   override def toString = {
     val name = s"${col.name}".split('/').last.split('.').head
@@ -129,26 +140,26 @@ case class PyColumn[+T: ru.TypeTag](col: Column) {
   def name = col.name
   def tpe = s"${col.colType}"
 
-  def javaToPython: JavaRDD[Array[Byte]] = col.colType match {
-    case ColType.Double => BigDFPyRDD.pythonRDD(col.doubleRdd)
-    case ColType.String => BigDFPyRDD.pythonRDD(col.stringRdd)
-    case ColType.Float => BigDFPyRDD.pythonRDD(col.floatRdd)
-    case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
-    case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
-    case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
-    case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
-    case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
-    case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
-  }
-
-  def pythonToJava[T: ClassTag](c: JavaRDD[Array[Byte]]): PyColumn[Any] = {
-    //FIXME: other types
-    val jrdd: JavaRDD[T] = BigDFPyRDD.javaRDD(c)
-    val tpe = classTag[T]
-    if (tpe == classTag[Double]) PyColumn[Double](Column(jrdd.rdd.asInstanceOf[RDD[Double]]))
-    else if (tpe == classTag[String]) PyColumn(Column(jrdd.rdd.asInstanceOf[RDD[String]]))
-    else null
-  }
+//  def javaToPython: JavaRDD[Array[Byte]] = col.colType match {
+//    case ColType.Double => BigDFPyRDD.pythonRDD(col.doubleRdd)
+//    case ColType.String => BigDFPyRDD.pythonRDD(col.stringRdd)
+//    case ColType.Float => BigDFPyRDD.pythonRDD(col.floatRdd)
+//    case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
+//    case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
+//    case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
+//    case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
+//    case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
+//    case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
+//  }
+//
+//  def pythonToJava[T: ClassTag](c: JavaRDD[Array[Byte]]): PyColumn[Any] = {
+//    //FIXME: other types
+//    val jrdd: JavaRDD[T] = BigDFPyRDD.javaRDD(c)
+//    val tpe = classTag[T]
+//    if (tpe == classTag[Double]) PyColumn[Double](Column(jrdd.rdd.asInstanceOf[RDD[Double]]))
+//    else if (tpe == classTag[String]) PyColumn(Column(jrdd.rdd.asInstanceOf[RDD[String]]))
+//    else null
+//  }
 
   def add(v: Double) = {
     PyColumn(col + v)

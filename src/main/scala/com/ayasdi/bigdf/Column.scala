@@ -258,7 +258,7 @@ class Column private[bigdf](var scol: SColumn,
 object Column {
   import scala.language.implicitConversions
   implicit def column2SColumn(col: Column): SColumn = col.scol
-  implicit def column2RDD(col: Column): DoubleRDDFunctions = new DoubleRDDFunctions(col.doubleRdd)
+  implicit def column2DoubleRDD(col: Column): DoubleRDDFunctions = new DoubleRDDFunctions(col.doubleRdd)
   implicit def column2SparkColumnFunctions(col: Column): SparkColumnFunctions = new SparkColumnFunctions(col.scol)
   implicit def column2Expr(col: Column): Expression = new SparkColumnFunctions(col.scol).expr
 

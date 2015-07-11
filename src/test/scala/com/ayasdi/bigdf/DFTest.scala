@@ -484,6 +484,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     val df = makeDF
     val mean = df("a").mean()
     assert(mean === df("a").doubleRdd.mean)
+    assert(df("a").doubleRdd.min === 11.0)
   }
 
   //  test("Pivot") {
