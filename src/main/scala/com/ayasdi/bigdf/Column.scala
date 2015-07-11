@@ -13,7 +13,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.{universe => ru}
 
-import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.{DoubleRDDFunctions, RDD}
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
@@ -271,6 +271,8 @@ class Column private[bigdf](var scol: SColumn,
 
 object Column {
   import scala.language.implicitConversions
+  implicit def column2SColumn(col: Column): SColumn = col.scol
+  implicit def column2RDD(col: Column): DoubleRDDFunctions = new DoubleRDDFunctions(col.doubleRdd)
   implicit def column2SparkColumnFunctions(col: Column): SparkColumnFunctions = new SparkColumnFunctions(col.scol)
   implicit def column2Expr(col: Column): Expression = new SparkColumnFunctions(col.scol).expr
 

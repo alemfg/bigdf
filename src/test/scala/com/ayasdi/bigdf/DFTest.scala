@@ -473,6 +473,21 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     println(tfs.first())
   }
 
+  test("Join") {
+    val df1 = makeDF
+    val df2 = makeDF
+    val df3 = df1.join(df2, "a", "inner")
+    df3.list()
+    assert(df3.columnCount === 7)
+    assert(df3.rowCount === 3)
+  }
+
+  test("Column of Double: Double RDD functions") {
+    val df = makeDF
+    val mean = df("a").mean()
+    assert(mean === df("a").doubleRdd.mean)
+  }
+
   //  test("Pivot") {
   //    val df = makeDFFromCSVFile("src/test/resources/pivot.csv")
   //    df.list()

@@ -57,11 +57,7 @@ case class PyDF(df: DF) {
     DF.compareSchema(a.df, b.df)
 
   def join(sc: SparkContext, left: PyDF, right: PyDF, on: String, how: String) = {
-    val joinType = how match {
-      case "inner" => JoinType.Inner
-      case _ => throw new IllegalArgumentException(s"$how join not supported")
-    }
-    PyDF(DF.join(sc, left.df, right.df, on, joinType))
+    PyDF(left.df.join(right.df, on, how))
   }
 
   def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String): PyDF = {

@@ -185,8 +185,11 @@ class DF private(var sdf: DataFrame,
    */
   def setColumn(colName: String, that: Column): Unit = {
     require(that.df.isEmpty && that.index == -1)
-    sdf = sdf.withColumn(colName, that.scol) //FIXME: handle if exists case
+    if(sdf.columns.contains(colName))
+      sdf = sdf.drop(colName)
+    sdf = sdf.withColumn(colName, that.scol)
     that.df = Some(this)
+    that.index = sdf.columns.indexOf(colName)
   }
 
   /**
@@ -194,10 +197,9 @@ class DF private(var sdf: DataFrame,
    * @param colIndex index of column, will be overwritten if it exists
    * @param that column to add to this df
    */
-  //FIXME: unit test
-  def setColumn(colIndex: Int, that: Column) = {
+  def setColumn(colIndex: Int, that: Column): Unit = {
     require(that.df.isEmpty && that.index == -1 && colIndex < columnCount && column(that.name) == null)
-    ???
+    setColumn(sdf.columns(colIndex), that)
   }
 
   /**
@@ -318,27 +320,27 @@ class DF private(var sdf: DataFrame,
   def groupBy(colName: String) = sdf.groupBy(colName)
 
   /**
-   * print brief description of the DF
+   * join this with DF with another
+   * @param that another DF
+   * @param on a column common to both DFs
+   * @param joinType "inner" only for now
    */
-  def describe(colNames: String*) = sdf.describe(colNames: _*)
+  def join(that: DF, on: String, joinType: String) = {
+    require(joinType == "inner", "Only inner join is supported")
+    new DF(sdf.join(that.sdf, on), options, s"${this.name}_join_${that.name}")
+  }
 
   /**
    * print upto numRows x numCols elements of the dataframe
    */
   def list(numRows: Int = 10, numCols: Int = 10): Unit = sdf.show(numRows)
 
-  /**
-   * get the first few rows
-   */
-  def head(numRows: Int = 10) = sdf.head(numRows)
-
-  /**
-   * get the first row
-   */
-  def first() = sdf.first()
 }
 
 object DF {
+  import scala.language.implicitConversions
+  implicit def df2DataFrame(df: DF): DataFrame = df.sdf
+
   /**
    * create DF from a text file with given separator
    * first line of file is a header
@@ -492,11 +494,6 @@ object DF {
     val sdf = sqlContext.createDataFrame(rows, StructType(colTypes.toArray))
     new DF(sdf, options, dfName)
   }
-
-  /**
-   * relational-like join two DFs
-   */
-  def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType = JoinType.Inner) = ???
 
   def compareSchema(a: DF, b: DF) = a.sdf.schema == b.sdf.schema
 
