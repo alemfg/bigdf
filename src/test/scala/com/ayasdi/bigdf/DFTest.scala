@@ -415,6 +415,13 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df("new2").doubleRdd.first === 21 + 11)
   }
 
+  test("Select columns") {
+    val df1 = makeDF
+    val df2 = df1.select("a", "Date")
+
+    assert(df2.columnNames === Array("a", "Date"))
+  }
+
   test("Aggregate: Catalyst") {
     val df = makeDF
     df("groupByThis") = df("a").map[Double, Double] { x => 1.0 }

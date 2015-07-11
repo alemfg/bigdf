@@ -49,7 +49,7 @@ case class PyDF(df: DF) {
     PyDF(df.where(predicate.p))
   }
 
-  def update(name: String, pycol: PyColumn[_]) = {
+  def update(name: String, pycol: PyColumn[_]): Unit = {
     df.update(name, pycol.col)
   }
 
@@ -80,6 +80,8 @@ case class PyDF(df: DF) {
     PyDF(dfAgg)
   }
 
+  def select(colNames: JArrayList[String])  = df.select(colNames.head, colNames.tail : _ *)
+
   def groupBy(colName: String) = df.groupBy(colName)
 
   def pivot(keyCol: String, pivotByCol: String,
@@ -105,11 +107,6 @@ object PyDF {
 
   def fromCSVDir(sc: SparkContext, name: String, pattern: String, recursive: Boolean, separator: String) =
     PyDF(DF.fromCSVDir(sc, name, pattern, recursive, separator.charAt(0), 0, Options()))
-
-  def fromColumns(sc: SparkContext, pycols: JArrayList[PyColumn[Any]], name: String): PyDF = {
-    val cols = pycols.map(_.col)
-    PyDF(DF.fromColumns(sc, cols, name, Options()))
-  }
 
   def readParquet(sc: SparkContext, infile: String): PyDF = {
     PyDF(DF.fromParquet(sc, infile, Options()))

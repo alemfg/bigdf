@@ -209,6 +209,12 @@ class DF private(var sdf: DataFrame,
   def columnsByNames(colNames: Seq[String]) = colNames.map(column(_))
 
   /**
+   * get a new DF with a subset of columns
+   */
+  def select(colName: String, colNames: String*) = new DF(sdf.select(colName, colNames: _*),
+    options, s"select_$name")
+
+  /**
    * wrapper on filter to create a new DF from filtered RDD
    * @param cond a predicate to filter on e.g. df("price") > 10
    */
@@ -375,16 +381,6 @@ object DF {
     val numPartitions = if (nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
     val dfs = files.map { file => fromCSVFile(sc, file, separator, numPartitions) }
     union(sc, dfs)
-  }
-
-  def fromColumns(sc: SparkContext, cols: Seq[Column], name: String, options: Options): DF = {
-    val sqlContext = new SQLContext(sc)
-    var sdf = sqlContext.emptyDataFrame
-    cols.foreach { col =>
-      sdf = sdf.withColumn(col.name, col.scol)
-    }
-
-    new DF(sdf, options, name)
   }
 
   /**
