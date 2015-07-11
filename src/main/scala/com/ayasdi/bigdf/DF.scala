@@ -10,19 +10,14 @@ import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.catalyst.expressions.AggregateExpression
+import org.apache.spark.sql.catalyst.analysis.Star
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column => SColumn, _}
+import org.apache.spark.sql.{Column => SColumn, Row, _}
 import org.apache.spark.storage.StorageLevel
 import com.databricks.spark.csv.{CsvParser => SParser, CsvSchemaRDD}
-
-/**
- * types of joins
- */
-object JoinType extends Enumeration {
-  type JoinType = Value
-  val Inner, Outer = Value
-}
+import org.apache.spark.sql.MoreFunctions._
+import org.apache.spark.sql.functions._
 
 /**
  * A DF is a "list of vectors of equal length". It is a 2-dimensional tabular
@@ -282,9 +277,22 @@ class DF private(var sdf: DataFrame,
     aggregate(List(aggByCol), Map(aggdCol -> aggtor))
   }
 
-  def aggregate(aggByCols: Seq[String], aggdExpr: AggregateExpression) = {
-    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(SparkColumnFunctions(aggdExpr))
+  def aggregate(aggByCols: Seq[String], aggdExpr: AggregateExpression, aggdExprs: AggregateExpression*) = {
+    val aggdCols = (aggdExpr +: aggdExprs).map(SparkColumnFunctions(_))
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdCols.head, aggdCols.tail : _*)
     new DF(aggdSdf, options, s"aggd:$name")
+  }
+
+  private[this] def strToExpr(expr: String): (SColumn => SColumn) = {
+    expr.toLowerCase match {
+      case "avg" | "average" | "mean" => avg
+      case "max" => max
+      case "min" => min
+      case "sum" => sum
+      case "stddev" => stddev
+      case "freq" | "frequency" => frequency
+      case "count" | "size" => count
+    }
   }
 
   /**
@@ -294,7 +302,11 @@ class DF private(var sdf: DataFrame,
    * @return new DF with first column aggByCol and second aggedCol
    */
   def aggregate(aggByCols: Seq[String], aggdCols: Map[String, String]): DF = {
-    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdCols)
+    val aggdExprs = aggdCols.map { case (colName, aggtor) =>
+      strToExpr(aggtor)(sdf(colName))
+    }.toSeq
+
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdExprs.head, aggdExprs.tail : _*)
     new DF(aggdSdf, options, s"aggd:$name")
   }
 

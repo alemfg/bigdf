@@ -389,7 +389,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     RichDF(df).newCol = RichDF(df).a + RichDF(df).b
     assert(RichDF(df).newCol.doubleRdd.first === aa + bb)
-   }
+  }
 
   test("Column Ops: New column as simple function of existing column and scalar") {
     val df = makeDF
@@ -447,9 +447,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   test("Aggregate: multiple") {
     val df = makeDFFromCSVFile("src/test/resources/aggregate.csv")
     df.list()
-    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum", "Feature2" -> "Mean"))
+    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum",
+      "Feature2" -> "Mean",
+      "Day" -> "Frequency"))
     aggd.list()
-    assert(aggd.columnCount === 4)
+
+    assert(aggd.columnCount === 5)
     assert(aggd(aggd("Customer") === "Mohit Jaggi" && aggd("Month") === 2.0)
       .first().get(2) === 9.0)
     assert(aggd(aggd("Customer") === "Jack Jill" && aggd("Month") === 1.0)
