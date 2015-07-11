@@ -53,7 +53,7 @@ object ColType {
 
 /**
  * One column in a DF. It is a collection of elements of the same type. Can be contained in at most one DF. Once
- * assigned to a DF cannot be "moved" to another DF. To do that make a copy using Column.makeCopy
+ * assigned to a DF cannot be "moved" to another DF.
  * @param scol spark sql/catalyst/dataframe column
  * @param index the index at which this Column exists in containing DF. -1 if not in a DF yet.
  * @param name the name of this Column in containing DF
@@ -108,25 +108,11 @@ class Column private[bigdf](var scol: SColumn,
   }
 
   /**
-   * print brief description of this column, processes the whole column
-   */
-  def describe(): Unit = {
-    val c = if (df.isEmpty) 0 else count
-    println(s"\ttype:${colType}\n\tcount:${c}\n\tparseErrors:${parseErrors}")
-    if (isDouble) df.get.describe(name)
-  }
-
-  /**
    * get the upto max entries in the column as strings
    */
   def head(max: Int): Array[String] = {
     df.get.sdf.select(name).head(max).map(_.toString())
   }
-
-  /**
-   * make a clone of this column, the clone does not belong to any DF and has no name
-   */
-  def makeCopy = new Column(scol)
 
   /**
    * print upto max(default 10) elements
@@ -147,47 +133,47 @@ class Column private[bigdf](var scol: SColumn,
   }
 
   /**
-   * get rdd of doubles to use doublerddfunctions etc
+   * get column as rdd of doubles to use doublerddfunctions etc
    */
   def doubleRdd = getRdd[Double]
 
   /**
-   * get rdd of floats
+   * get column as rdd of floats
    */
   def floatRdd = getRdd[Float]
 
   /**
-   * get rdd of strings to do string functions
+   * get column as rdd of strings to do string functions
    */
   def stringRdd = getRdd[String]
 
   /**
-   * get rdd of shorts
+   * get column as rdd of shorts
    */
   def shortRdd = getRdd[Short]
 
   /**
-   * get rdd of shorts
+   * get column as rdd of shorts
    */
   def longRdd = getRdd[Long]
 
   /**
-   * get rdd of array of strings to do text analysis
+   * get column as rdd of array of strings to do text analysis
    */
   def arrayOfStringRdd = getRdd[ArrayBuffer[String]]
 
   /**
-   * get rdd of array of doubles
+   * get column as rdd of array of doubles
    */
   def arrayOfDoubleRdd = getRdd[ArrayBuffer[Double]]
 
   /**
-   * get rdd of array of doubles
+   * get column as rdd of array of doubles
    */
   def arrayOfFloatRdd = getRdd[ArrayBuffer[Float]]
 
   /**
-   * get rdd of map from string to float for things like tfidf values of terms
+   * get column as rdd of map from string to float for things like tfidf values of terms
    */
   def mapOfStringToFloatRdd = getRdd[Map[String, Float]]
 
@@ -197,8 +183,8 @@ class Column private[bigdf](var scol: SColumn,
    * @return RDD of R's. throws exception if the cast is not applicable to this column
    */
   def getRdd[R: ru.TypeTag] = {
-    require(SparkUtil.typeTagToSql(ru.typeOf[R]) == sqlType, s"${ru.typeOf[R]} does not match ${sqlType}")
-    require(!df.isEmpty)
+    require(SparkUtil.typeTagToSql(ru.typeOf[R]) == sqlType, s"${ru.typeOf[R]} does not match $sqlType")
+    require(df.nonEmpty)
     df.get.sdf.select(name).rdd.map(_(0).asInstanceOf[R])(SparkUtil.typeTagToClassTag[R])
   }
 
@@ -223,22 +209,22 @@ class Column private[bigdf](var scol: SColumn,
   def *(that: Column) = new Column(scol * that.scol)
 
   /**
-   * add a number to a column
+   * add a constant to a column
    */
   def +(that: Any) = new Column(scol + that)
 
   /**
-   * subtract a number from a column
+   * subtract a constant from a column
    */
   def -(that: Any) = new Column(scol - that)
 
   /**
-   * divide a column by a number
+   * divide a column by a constant
    */
   def /(that: Any) = new Column(scol / that)
 
   /**
-   * multiply a column with a number
+   * multiply a column with a constant
    */
   def *(that: Any) = new Column(scol * that)
 

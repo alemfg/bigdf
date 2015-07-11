@@ -118,16 +118,15 @@ object PyDF {
 
 case class PyColumn[+T: ru.TypeTag](col: Column) {
   def list(numRows: Int) = col.list(numRows)
-  def head(numRows: Int) = col.head(numRows)  
+  def head(numRows: Int) = col.head(numRows)
+  def count = col.count
 
   override def toString = {
     val name = s"${col.name}".split('/').last.split('.').head
     s"$name\t${col.colType}"
   }
 
-  def setName(name: String): Unit = { col.name = name }
   def name = col.name
-  def makeCopy = PyColumn(col.makeCopy)
   def tpe = s"${col.colType}"
 
   def javaToPython: JavaRDD[Array[Byte]] = col.colType match {

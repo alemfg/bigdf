@@ -389,9 +389,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     RichDF(df).newCol = RichDF(df).a + RichDF(df).b
     assert(RichDF(df).newCol.doubleRdd.first === aa + bb)
-    RichDF(df).newCol = RichDF(df).a.makeCopy
-    assert(RichDF(df).newCol.doubleRdd.first === aa)
-  }
+   }
 
   test("Column Ops: New column as simple function of existing column and scalar") {
     val df = makeDF
