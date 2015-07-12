@@ -10,14 +10,12 @@ import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.catalyst.analysis.Star
+import org.apache.spark.sql.MoreFunctions._
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column => SColumn, Row, _}
-import org.apache.spark.storage.StorageLevel
 import com.databricks.spark.csv.{CsvParser => SParser, CsvSchemaRDD}
-import org.apache.spark.sql.MoreFunctions._
-import org.apache.spark.sql.functions._
 
 /**
  * A DF is a "list of vectors of equal length". It is a 2-dimensional tabular
@@ -29,35 +27,20 @@ import org.apache.spark.sql.functions._
 class DF private(var sdf: DataFrame,
                  val options: Options,
                  val name: String) {
+
+  if(options.perfTuningOpts.cache) sdf.cache()
+
   /**
    * number of rows in df, this cannot change. any operation that changes this returns a new df
    * @return number of rows
    */
-  def rowCount = sdf.count
-
-  //lazy val rowIndexRdd = sdf.rcolumn(0).rdd.zipWithIndex().map(_._2.toDouble)
-
-  /**
-   * creates(if not already present) a column with name rowIndexCol that contains a series from zero
-   * until rowCount
-   * @return column of row indices
-   */
-  //  lazy val rowIndexCol = {
-  //    val col = Column(sc, rowIndexRdd, -1, "rowIndexCol")
-  //    setColumn("rowIndexCol", col)
-  //    col
-  //  }
+  def rowCount = sdf.count()
 
   /**
    * number of columns in df
    * @return number of columns
    */
   def columnCount = sdf.columns.length
-
-  /**
-   * rdd caching storage level. see spark's rdd.cache() for details.
-   */
-  private val storageLevel: StorageLevel = options.perfTuningOpts.storageLevel
 
   /**
    * column names in order from first to last numerical index
@@ -352,6 +335,40 @@ class DF private(var sdf: DataFrame,
    * print upto numRows x numCols elements of the dataframe
    */
   def list(numRows: Int = 10, numCols: Int = 10): Unit = sdf.show(numRows)
+
+  var rowIndexCol = s"${name}_rowIndex"
+  var rowIndexExists = false
+
+  /**
+   * add a column with row indices
+   * @param offset start of row indices
+   * @param colName name of row index column
+   * @param inFront index at the beginning or end of existing columns
+   */
+  def zipWithIndex(offset: Int = 1, colName: String = rowIndexCol, inFront: Boolean = true): Unit = {
+    rowIndexCol = colName
+    sdf = sdf.sqlContext.createDataFrame(
+      sdf.rdd.zipWithIndex.map(row =>
+        Row.fromSeq(
+          (if (inFront) Seq(row._2 + offset) else Seq())
+            ++ row._1.toSeq ++
+            (if (inFront) Seq() else Seq(row._2 + offset))
+        )
+      ),
+      StructType(
+        (if (inFront) Array(StructField(colName, LongType, false)) else Array[StructField]())
+          ++ sdf.schema.fields ++
+          (if (inFront) Array[StructField]() else Array(StructField(colName, LongType, false)))
+      )
+    )
+    rowIndexExists = true
+  }
+
+  def rowSlice(start: Long, end: Long): DF = {
+    if(!rowIndexExists) zipWithIndex()
+    new DF(sdf.where(sdf(rowIndexCol) >= start && sdf(rowIndexCol) <= end),
+      options, s"$name[${start}_$end]")
+  }
 
 }
 
