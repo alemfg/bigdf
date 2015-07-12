@@ -147,17 +147,17 @@ case class PyColumn[T: ru.TypeTag](col: Column) {
   def name = col.name
   def tpe = s"${col.colType}"
 
-//  def javaToPython: JavaRDD[Array[Byte]] = col.colType match {
-//    case ColType.Double => BigDFPyRDD.pythonRDD(col.doubleRdd)
-//    case ColType.String => BigDFPyRDD.pythonRDD(col.stringRdd)
-//    case ColType.Float => BigDFPyRDD.pythonRDD(col.floatRdd)
-//    case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
-//    case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
-//    case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
-//    case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
-//    case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
-//    case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
-//  }
+ def javaToPython: JavaRDD[Array[Byte]] = col.colType match {
+   case ColType.Double => BigDFPyRDD.pythonRDD(col.doubleRdd)
+   case ColType.String => BigDFPyRDD.pythonRDD(col.stringRdd)
+   case ColType.Float => BigDFPyRDD.pythonRDD(col.floatRdd)
+   case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
+   case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
+   case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
+   case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
+   case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
+   case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
+ }
 //
 //  def pythonToJava[T: ClassTag](c: JavaRDD[Array[Byte]]): PyColumn[Any] = {
 //    //FIXME: other types
