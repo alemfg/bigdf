@@ -16,6 +16,9 @@ case class SchemaGuessingOpts(fastSamplingSize: Int = 5,
                               fastSamplingEnable: Boolean = true)
 
 case class PerfTuningOpts(cache: Boolean = true)
+
+case class ParquetOpts(binaryAsString: Boolean = true)
+
 /**
  * bigdf configurable options with default values
  * @param numberParsingOpts options to control parsing of numbers
@@ -30,4 +33,5 @@ case class Options(numberParsingOpts: NumberParsingOpts = NumberParsingOpts(),
                    lineParsingOpts: LineParsingOpts = LineParsingOpts(),
                    csvParsingOpts: CSVParsingOpts = CSVParsingOpts(),
                    schemaGuessingOpts: SchemaGuessingOpts = SchemaGuessingOpts(),
-                   perfTuningOpts: PerfTuningOpts = PerfTuningOpts())
+                   perfTuningOpts: PerfTuningOpts = PerfTuningOpts(),
+                   parquetOpts: ParquetOpts = ParquetOpts())

@@ -428,7 +428,6 @@ object DF {
                   schema: Map[String, ColType.EnumVal] = Map(),
                   options: Options = Options()): DF = {
     val sqlContext = new SQLContext(sc)
-    sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
     val inferredSchema = SchemaUtils.inferSchema(sc, inFile, schema, options)
 
     val sdf = new SParser().withUseHeader(true)
@@ -451,7 +450,9 @@ object DF {
                   inFile: String,
                   options: Options = Options()): DF = {
     val sqlContext = new SQLContext(sc)
-    sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
+    if(options.parquetOpts.binaryAsString)
+      sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
+
     val sdf = sqlContext.read.parquet(inFile)
     require(sdf.schema.fields.forall { field =>
       field.dataType == DoubleType ||
@@ -484,7 +485,6 @@ object DF {
     require(vecs.map(_.length).toSet.size == 1, "Not a Vector of Vectors")
 
     val sqlContext = new SQLContext(sc)
-    sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
     val cols = vecs.map { vec => sc.parallelize(vec) }.toSeq
     val rows = ColumnZipper.zipAndMap(cols) {
       Row.fromSeq(_)
