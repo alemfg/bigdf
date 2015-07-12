@@ -55,7 +55,7 @@ case class PyDF(df: DF) {
     PyDF(df.where(predicate.p))
   }
 
-  def update(name: String, pycol: PyColumn[_]): Unit = {
+  def update(name: String, pycol: PyColumn): Unit = {
     df.update(name, pycol.col)
   }
 
@@ -123,7 +123,7 @@ object PyDF {
   }
 }
 
-case class PyColumn[T: ru.TypeTag](col: Column) {
+case class PyColumn(col: Column) {
   def list(numRows: Int) = col.list(numRows)
   def head(numRows: Int) = col.head(numRows)
   def count = col.count
@@ -134,8 +134,8 @@ case class PyColumn[T: ru.TypeTag](col: Column) {
   def stddev = col.stdev()
   def variance = col.variance()
   def histogram(nBuckets: Int) = col.histogram(nBuckets)
-  def first = col.getRdd[T].first()
-  def distinct = col.getRdd[T].distinct()
+  def first = col.first().get(0)
+  def distinct = col.distinct.collect().map(_.get(0))
   def sum = col.sum()
   def stats = col.stats()
 
@@ -212,7 +212,7 @@ case class PyPredicate(p: SColumn) {
 }
 
 object PyPredicate {
-  def where[T](column: PyColumn[T], operator: String, value: Double): PyPredicate = {
+  def where(column: PyColumn, operator: String, value: Double): PyPredicate = {
     val filter = operator match {
       case "==" => column.col === value
       case "!=" => column.col !== value
@@ -224,7 +224,7 @@ object PyPredicate {
     PyPredicate(filter)
   }
 
-  def where[T](column: PyColumn[T], operator: String, value: String): PyPredicate = {
+  def where(column: PyColumn, operator: String, value: String): PyPredicate = {
     val filter = operator match {
       case "==" => column.col === value
       case "!=" => column.col !== value

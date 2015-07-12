@@ -459,6 +459,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       .first().get(3) === 77.0)
   }
 
+  test ("Column utils: first, distinct") {
+    val df = makeDF
+    assert(df("a").first().get(0) === 11.0)
+    assert(df("a").distinct.collect().map(_.get(0)).toSet === df("a").doubleRdd.collect().toSet)
+  }
+
   test("Aggregate: SparseSum") {
     val df = makeDFWithSparseCols
     df.list()

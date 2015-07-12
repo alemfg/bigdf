@@ -244,6 +244,10 @@ class Column private[bigdf](var scol: SColumn,
 
   def <=(that: Any) = scol <= that
 
+  def first() = df.get.sdf.select(name).first()
+
+  def distinct = df.get.sdf.select(name).distinct
+
   /**
    * apply a given function to a column to generate a new column
    * the new column does not belong to any DF automatically
