@@ -86,7 +86,8 @@ case class PyDF(df: DF) {
     PyDF(dfAgg)
   }
 
-  def select(colNames: JArrayList[String])  = df.select(colNames.head, colNames.tail : _ *)
+  def select(colNames: JArrayList[String]): PyDF  =
+    PyDF(df.select(colNames.head, colNames.tail : _ *))
 
   def groupBy(colName: String) = df.groupBy(colName)
 
