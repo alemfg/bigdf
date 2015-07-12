@@ -10,19 +10,14 @@ import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.catalyst.expressions.AggregateExpression
+import org.apache.spark.sql.catalyst.analysis.Star
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column => SColumn, _}
+import org.apache.spark.sql.{Column => SColumn, Row, _}
 import org.apache.spark.storage.StorageLevel
 import com.databricks.spark.csv.{CsvParser => SParser, CsvSchemaRDD}
-
-/**
- * types of joins
- */
-object JoinType extends Enumeration {
-  type JoinType = Value
-  val Inner, Outer = Value
-}
+import org.apache.spark.sql.MoreFunctions._
+import org.apache.spark.sql.functions._
 
 /**
  * A DF is a "list of vectors of equal length". It is a 2-dimensional tabular
@@ -185,8 +180,11 @@ class DF private(var sdf: DataFrame,
    */
   def setColumn(colName: String, that: Column): Unit = {
     require(that.df.isEmpty && that.index == -1)
-    sdf = sdf.withColumn(colName, that.scol) //FIXME: handle if exists case
+    if(sdf.columns.contains(colName))
+      sdf = sdf.drop(colName)
+    sdf = sdf.withColumn(colName, that.scol)
     that.df = Some(this)
+    that.index = sdf.columns.indexOf(colName)
   }
 
   /**
@@ -194,10 +192,9 @@ class DF private(var sdf: DataFrame,
    * @param colIndex index of column, will be overwritten if it exists
    * @param that column to add to this df
    */
-  //FIXME: unit test
-  def setColumn(colIndex: Int, that: Column) = {
+  def setColumn(colIndex: Int, that: Column): Unit = {
     require(that.df.isEmpty && that.index == -1 && colIndex < columnCount && column(that.name) == null)
-    ???
+    setColumn(sdf.columns(colIndex), that)
   }
 
   /**
@@ -205,6 +202,12 @@ class DF private(var sdf: DataFrame,
    * @param colNames names of columns
    */
   def columnsByNames(colNames: Seq[String]) = colNames.map(column(_))
+
+  /**
+   * get a new DF with a subset of columns
+   */
+  def select(colName: String, colNames: String*) = new DF(sdf.select(colName, colNames: _*),
+    options, s"select_$name")
 
   /**
    * wrapper on filter to create a new DF from filtered RDD
@@ -274,9 +277,22 @@ class DF private(var sdf: DataFrame,
     aggregate(List(aggByCol), Map(aggdCol -> aggtor))
   }
 
-  def aggregate(aggByCols: Seq[String], aggdExpr: AggregateExpression) = {
-    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(SparkColumnFunctions(aggdExpr))
+  def aggregate(aggByCols: Seq[String], aggdExpr: AggregateExpression, aggdExprs: AggregateExpression*) = {
+    val aggdCols = (aggdExpr +: aggdExprs).map(SparkColumnFunctions(_))
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdCols.head, aggdCols.tail : _*)
     new DF(aggdSdf, options, s"aggd:$name")
+  }
+
+  private[this] def strToExpr(expr: String): (SColumn => SColumn) = {
+    expr.toLowerCase match {
+      case "avg" | "average" | "mean" => avg
+      case "max" => max
+      case "min" => min
+      case "sum" => sum
+      case "stddev" => stddev
+      case "freq" | "frequency" => frequency
+      case "count" | "size" => count
+    }
   }
 
   /**
@@ -286,7 +302,11 @@ class DF private(var sdf: DataFrame,
    * @return new DF with first column aggByCol and second aggedCol
    */
   def aggregate(aggByCols: Seq[String], aggdCols: Map[String, String]): DF = {
-    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdCols)
+    val aggdExprs = aggdCols.map { case (colName, aggtor) =>
+      strToExpr(aggtor)(sdf(colName))
+    }.toSeq
+
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdExprs.head, aggdExprs.tail : _*)
     new DF(aggdSdf, options, s"aggd:$name")
   }
 
@@ -318,27 +338,27 @@ class DF private(var sdf: DataFrame,
   def groupBy(colName: String) = sdf.groupBy(colName)
 
   /**
-   * print brief description of the DF
+   * join this with DF with another
+   * @param that another DF
+   * @param on a column common to both DFs
+   * @param joinType "inner" only for now
    */
-  def describe(colNames: String*) = sdf.describe(colNames: _*)
+  def join(that: DF, on: String, joinType: String) = {
+    require(joinType == "inner", "Only inner join is supported")
+    new DF(sdf.join(that.sdf, on), options, s"${this.name}_join_${that.name}")
+  }
 
   /**
    * print upto numRows x numCols elements of the dataframe
    */
   def list(numRows: Int = 10, numCols: Int = 10): Unit = sdf.show(numRows)
 
-  /**
-   * get the first few rows
-   */
-  def head(numRows: Int = 10) = sdf.head(numRows)
-
-  /**
-   * get the first row
-   */
-  def first() = sdf.first()
 }
 
 object DF {
+  import scala.language.implicitConversions
+  implicit def df2DataFrame(df: DF): DataFrame = df.sdf
+
   /**
    * create DF from a text file with given separator
    * first line of file is a header
@@ -373,16 +393,6 @@ object DF {
     val numPartitions = if (nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
     val dfs = files.map { file => fromCSVFile(sc, file, separator, numPartitions) }
     union(sc, dfs)
-  }
-
-  def fromColumns(sc: SparkContext, cols: Seq[Column], name: String, options: Options): DF = {
-    val sqlContext = new SQLContext(sc)
-    var sdf = sqlContext.emptyDataFrame
-    cols.foreach { col =>
-      sdf = sdf.withColumn(col.name, col.scol)
-    }
-
-    new DF(sdf, options, name)
   }
 
   /**
@@ -497,11 +507,6 @@ object DF {
     val sdf = sqlContext.createDataFrame(rows, StructType(colTypes.toArray))
     new DF(sdf, options, dfName)
   }
-
-  /**
-   * relational-like join two DFs
-   */
-  def join(sc: SparkContext, left: DF, right: DF, on: String, how: JoinType.JoinType = JoinType.Inner) = ???
 
   def compareSchema(a: DF, b: DF) = a.sdf.schema == b.sdf.schema
 

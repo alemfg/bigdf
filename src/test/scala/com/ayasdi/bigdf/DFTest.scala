@@ -389,8 +389,6 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     RichDF(df).newCol = RichDF(df).a + RichDF(df).b
     assert(RichDF(df).newCol.doubleRdd.first === aa + bb)
-    RichDF(df).newCol = RichDF(df).a.makeCopy
-    assert(RichDF(df).newCol.doubleRdd.first === aa)
   }
 
   test("Column Ops: New column as simple function of existing column and scalar") {
@@ -415,6 +413,13 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
     assert(df("new").doubleRdd.first === 21 + 11)
     assert(df("new2").doubleRdd.first === 21 + 11)
+  }
+
+  test("Select columns") {
+    val df1 = makeDF
+    val df2 = df1.select("a", "Date")
+
+    assert(df2.columnNames === Array("a", "Date"))
   }
 
   test("Aggregate: Catalyst") {
@@ -442,9 +447,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   test("Aggregate: multiple") {
     val df = makeDFFromCSVFile("src/test/resources/aggregate.csv")
     df.list()
-    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum", "Feature2" -> "Mean"))
+    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum",
+      "Feature2" -> "Mean",
+      "Day" -> "Frequency"))
     aggd.list()
-    assert(aggd.columnCount === 4)
+
+    assert(aggd.columnCount === 5)
     assert(aggd(aggd("Customer") === "Mohit Jaggi" && aggd("Month") === 2.0)
       .first().get(2) === 9.0)
     assert(aggd(aggd("Customer") === "Jack Jill" && aggd("Month") === 1.0)
@@ -471,6 +479,22 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df.list()
     val tfs = df.aggregate(List("groupByThis"), Frequency(df("a")))
     println(tfs.first())
+  }
+
+  test("Join") {
+    val df1 = makeDF
+    val df2 = makeDF
+    val df3 = df1.join(df2, "a", "inner")
+    df3.list()
+    assert(df3.columnCount === 7)
+    assert(df3.rowCount === 3)
+  }
+
+  test("Column of Double: Double RDD functions") {
+    val df = makeDF
+    val mean = df("a").mean()
+    assert(mean === df("a").doubleRdd.mean)
+    assert(df("a").doubleRdd.min === 11.0)
   }
 
   //  test("Pivot") {

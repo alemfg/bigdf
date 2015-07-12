@@ -15,11 +15,11 @@ import org.apache.spark.sql.{Column => SColumn}
 object Implicits {
   import scala.language.implicitConversions
 
-  implicit def columnAnyToRichColumnMap(col: Column) = new SparseColumnFunctions(col)
+  implicit def columnAnyToRichColumnMap(col: Column): SparseColumnFunctions = new SparseColumnFunctions(col)
 
-  implicit def columnSeqToRichColumnSeq(cols: Seq[Column]) = new RichColumnSeq(cols)
+  implicit def columnSeqToRichColumnSeq(cols: Seq[Column]): RichColumnSeq = new RichColumnSeq(cols)
 
-  implicit def dfToRichDF(df: DF) = new RichDF(df)
+  implicit def dfToRichDF(df: DF): RichDF = new RichDF(df)
 }
 
 case class RichDF(self: DF) extends Dynamic {
@@ -66,12 +66,12 @@ case class RichDF(self: DF) extends Dynamic {
   /**
    * update a column, add or replace
    */
-  def update(colName: String, that: Column) = {
+  def update(colName: String, that: Column): Unit = {
      self.setColumn(colName, that)
   }
 
   /**
    * update a column "c" of DF "df" like df.c = ... equivalent df("c") = ...
    */
-  def updateDynamic(colName: String)(that: Column) = update(colName, that)
+  def updateDynamic(colName: String)(that: Column): Unit = update(colName, that)
 }
