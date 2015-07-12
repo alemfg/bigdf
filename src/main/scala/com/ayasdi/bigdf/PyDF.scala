@@ -18,8 +18,11 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{BigDFPyRDD, SparkContext}
 import com.ayasdi.bigdf.Implicits._
 import org.apache.spark.sql.{Column => SColumn}
+import org.apache.spark.sql.DataFrame
 
 case class PyDF(df: DF) {
+  def sdf = df.sdf
+
   def columnNames = df.columnNames
 
   def column(name: String) = PyColumn(df.column(name))
@@ -30,6 +33,9 @@ case class PyDF(df: DF) {
   def columnByIndex(index: Int) = PyColumn(df.column(index))  
 
   def deleteColumn(colName: String) = df.delete(colName)
+
+  def describe(colNames: JArrayList[String]) =
+    df.describe(colNames.asScala.toList:_*)
 
   def colCount = df.columnCount
 
@@ -118,11 +124,15 @@ object PyDF {
   def readParquet(sc: SparkContext, infile: String): PyDF = {
     PyDF(DF.fromParquet(sc, infile, Options()))
   }
+  def fromSparkDF(sdf: DataFrame, name: String): PyDF = {
+    PyDF(DF.fromSparkDataFrame(sdf, name, Options()))
+  }
 }
 
 case class PyColumn[+T: ru.TypeTag](col: Column) {
   def list(numRows: Int) = col.list(numRows)
-  def head(numRows: Int) = col.head(numRows)  
+  def head(numRows: Int) = col.head(numRows)
+  def count() = col.count
 
   override def toString = {
     val name = s"${col.name}".split('/').last.split('.').head

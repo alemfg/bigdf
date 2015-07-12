@@ -439,6 +439,11 @@ object DF {
     new DF(sdf, options, "fromParquet: $inFile")
   }
 
+  def fromSparkDataFrame(sdf: DataFrame,
+                         name: String,
+                         options: Options = Options()): DF = {
+    new DF(sdf, options, "fromSparkDataFrame: $name")
+  }
 
   /**
    * create a DF given column names and vectors of columns(not rows)
