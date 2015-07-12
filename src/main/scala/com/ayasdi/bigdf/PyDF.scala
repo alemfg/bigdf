@@ -130,7 +130,7 @@ case class PyColumn[T: ru.TypeTag](col: Column) {
 
   def mean = col.mean()
   def max = col.doubleRdd.max()
-  def min = col.doubleRdd.max()
+  def min = col.doubleRdd.min()
   def stddev = col.stdev()
   def variance = col.variance()
   def histogram(nBuckets: Int) = col.histogram(nBuckets)
