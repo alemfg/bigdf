@@ -5,8 +5,7 @@
  */
 package com.ayasdi.bigdf
 
-import java.util.{ArrayList => JArrayList}
-import java.util.{HashMap => JHashMap}
+import java.util.{ArrayList => JArrayList, HashMap => JHashMap}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -14,11 +13,10 @@ import scala.reflect._
 import scala.reflect.runtime.{universe => ru}
 
 import org.apache.spark.api.java.JavaRDD
-import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{Column => SColumn, DataFrame}
 import org.apache.spark.{BigDFPyRDD, SparkContext}
 import com.ayasdi.bigdf.Implicits._
-import org.apache.spark.sql.{Column => SColumn}
-import org.apache.spark.sql.DataFrame
+import com.databricks.spark.csv.CSVParsingOpts
 
 case class PyDF(df: DF) {
   def sdf = df.sdf
@@ -116,13 +114,13 @@ case class PyDF(df: DF) {
 }
 
 object PyDF {
-  def fromCSV(sc: SparkContext, name: String, separator: String, fasterGuess: Boolean, nParts: Int): PyDF = {
-    val sep: Char = separator.charAt(0)
-    PyDF(DF(sc, name, sep, nParts, Options()))
-  }
+  def fromCSV(sc: SparkContext, name: String, separator: String, fasterGuess: Boolean, nParts: Int): PyDF =
+    PyDF(DF.fromCSVFile(sc, name,
+      options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
 
   def fromCSVDir(sc: SparkContext, name: String, pattern: String, recursive: Boolean, separator: String) =
-    PyDF(DF.fromCSVDir(sc, name, pattern, recursive, separator.charAt(0), 0, Options()))
+    PyDF(DF.fromCSVDir(sc, name, pattern, recursive,
+      options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
 
   def readParquet(sc: SparkContext, infile: String): PyDF = {
     PyDF(DF.fromParquet(sc, infile, Options()))

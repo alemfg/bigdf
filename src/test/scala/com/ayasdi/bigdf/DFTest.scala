@@ -110,16 +110,14 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Construct: DF from CSV file with missing fields, fill policy") {
-    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
-      options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Fill)))
+    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Fill)))
     df.list()
     assert(df.columnCount === 3)
     assert(df.rowCount === 8)
   }
 
   test("Construct: DF from CSV file with missing fields, ignore policy") {
-    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
-      options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Ignore)))
+    val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Ignore)))
     df.list()
     assert(df.columnCount === 3)
     assert(df.rowCount === 2)
@@ -127,8 +125,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
   test("Construct: DF from CSV file with missing fields, abort policy") {
     val exception = intercept[SparkException] {
-      val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", ',', 0,
-        options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Abort)))
+      val df = DF.fromCSVFile(sc, "src/test/resources/missingFields.csv", options = Options(lineParsingOpts = LineParsingOpts(badLinePolicy = LineExceptionPolicy.Abort)))
       df.list()
     }
     assert(exception.getMessage.contains("Bad line encountered, aborting"))
@@ -140,7 +137,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     assert(df.columnCount === 4)
     assert(df.rowCount === 8)
 
-    val df2 = DF.fromCSVDir(sc, "src/test/resources/multiFile", """.*\.csv""", false, ',', 0, Options())
+    val df2 = DF.fromCSVDir(sc, "src/test/resources/multiFile", """.*\.csv""", false, Options())
     assert(df2.columnCount === 4)
     assert(df2.rowCount === 8)
   }
@@ -247,7 +244,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Schema Dictate") {
-    val df = DF.fromCSVFile(sc, "src/test/resources/doubles.csv", ',', 0, Map("F1" -> ColType.String))
+    val df = DF.fromCSVFile(sc, "src/test/resources/doubles.csv", Map("F1" -> ColType.String))
     assert(df("F1").isString)
     df.list()
   }
@@ -447,7 +444,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   test("Aggregate: multiple") {
     val df = makeDFFromCSVFile("src/test/resources/aggregate.csv")
     df.list()
-    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum",
+    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum",  "Feature1" -> "Mean",
       "Feature2" -> "Mean",
       "Day" -> "Frequency"))
     aggd.list()

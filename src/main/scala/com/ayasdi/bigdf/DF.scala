@@ -15,7 +15,8 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column => SColumn, Row, _}
-import com.databricks.spark.csv.{CsvParser => SParser, CsvSchemaRDD}
+import com.ayasdi.bigdf.ColType.EnumVal
+import com.databricks.spark.csv.{CSVParsingOpts, CsvParser => SParser, CsvSchemaRDD}
 
 /**
  * A DF is a "list of vectors of equal length". It is a 2-dimensional tabular
@@ -386,8 +387,8 @@ object DF {
    * @param nParts number of parts to process in parallel
    */
   def apply(sc: SparkContext, inFile: String, separator: Char, nParts: Int, options: Options): DF = {
-    if (FileUtils.isDir(inFile)(sc)) fromCSVDir(sc, inFile, ".*", true, separator, nParts, options)
-    else fromCSVFile(sc, inFile, separator, nParts, options = options)
+    if (FileUtils.isDir(inFile)(sc)) fromCSVDir(sc, inFile, ".*", true, options)
+    else fromCSVFile(sc, inFile, options = options)
   }
 
   /**
@@ -396,19 +397,12 @@ object DF {
    * Only numeric(for now only Double) and String data types are supported
    * @param sc The spark context
    * @param inDir Full path to the input directory. If running on cluster, it should be accessible on all nodes
-   * @param separator The field separator e.g. ',' for CSV file
-   * @param nParts number of parts to process in parallel
+   * @param recursive recurse into subdirectories
+   * @param options see [[Options]]
    */
-  def fromCSVDir(sc: SparkContext,
-                 inDir: String,
-                 pattern: String,
-                 recursive: Boolean,
-                 separator: Char,
-                 nParts: Int,
-                 options: Options): DF = {
+  def fromCSVDir(sc: SparkContext, inDir: String, pattern: String, recursive: Boolean, options: Options): DF = {
     val files = FileUtils.dirToFiles(inDir, recursive, pattern)(sc)
-    val numPartitions = if (nParts == 0) 0 else if (nParts >= files.size) nParts / files.size else files.size
-    val dfs = files.map { file => fromCSVFile(sc, file, separator, numPartitions) }
+    val dfs = files.map { file => fromCSVFile(sc, file) }
     union(sc, dfs)
   }
 
@@ -418,14 +412,11 @@ object DF {
    * Only numeric(for now only Double) and String data types are supported
    * @param sc The spark context
    * @param inFile Full path to the input file. If running on cluster, it should be accessible on all nodes
-   * @param separator The field separator e.g. ',' for CSV file
-   * @param nParts number of parts to process in parallel
+   * @param options see [[Options]]
    */
   def fromCSVFile(sc: SparkContext,
                   inFile: String,
-                  separator: Char, //FIXME: move to options
-                  nParts: Int = 0,
-                  schema: Map[String, ColType.EnumVal] = Map(),
+                  schema: Map[String, EnumVal] = Map(),
                   options: Options = Options()): DF = {
     val sqlContext = new SQLContext(sc)
     val inferredSchema = SchemaUtils.inferSchema(sc, inFile, schema, options)
@@ -440,6 +431,19 @@ object DF {
 
     new DF(sdf, options, "fromCSV: $inFile")
   }
+
+  /**
+   * create DF from a tab separated text file
+   * first line of file is a header
+   * Only numeric(for now only Double) and String data types are supported
+   * @param sc The spark context
+   * @param inFile Full path to the input file. If running on cluster, it should be accessible on all nodes
+   */
+  def fromTSVFile(sc: SparkContext,
+                  inFile: String,
+                  schema: Map[String, EnumVal] = Map()): DF =
+    fromCSVFile(sc, inFile, schema, options = Options(csvParsingOpts = CSVParsingOpts(delimiter = '\t')))
+
 
   /**
    * create DF from a parquet file. Schema should be flat and contain numeric and string types only(for now)
@@ -469,9 +473,8 @@ object DF {
 
   def fromSparkDataFrame(sdf: DataFrame,
                          name: String,
-                         options: Options = Options()): DF = {
+                         options: Options = Options()): DF =
     new DF(sdf, options, "fromSparkDataFrame: $name")
-  }
 
   /**
    * create a DF given column names and vectors of columns(not rows)
