@@ -39,10 +39,9 @@ case class PyDF(df: DF) {
 
   def rowCount = df.rowCount
   
-  // def rowsByRange(start: Int, end: Int) = {
-  //   val r = Range(start, end)
-  //   PyDF(df.rowsByRange(r))
-  // }
+  def rowSlice(start: Int, end: Int) = {
+    PyDF(df.rowSlice(start, end))
+  }
 
   def rename(columns: JHashMap[String, String], inPlace: Boolean) =
     df.rename(columns.toMap, inPlace)
