@@ -73,6 +73,10 @@ case class PyDF(df: DF) {
     val dfAgg = aggregator match {
       case "Mean" => df.aggregate(byColumn, aggMap)
       case "Sum" => df.aggregate(byColumn, aggMap)
+      case "Frequency" => df.aggregate(byColumn, aggMap)
+      case "Min" => df.aggregate(byColumn, aggMap)
+      case "Max" => df.aggregate(byColumn, aggMap)
+      case "StdDev" => df.aggregate(byColumn, aggMap)        
       case "Count" => {
         df(aggrColumn.head).colType match {
           case ColType.Double => df.aggregate(byColumn, aggMap)
@@ -80,10 +84,15 @@ case class PyDF(df: DF) {
           case _ => throw new IllegalArgumentException("Count not yet supported for this column type")
         }
       }
-      case "StrJoin" => throw new IllegalArgumentException("not supported yet")
       case _ => null
     }
     PyDF(dfAgg)
+  }
+
+  def aggregateMultiple(byColumnJ: JArrayList[String], aggMapJ: JHashMap[String, String]): PyDF = {
+    val byColumn = byColumnJ.asScala.toList
+    val aggMap = aggMapJ.toMap
+    PyDF(df.aggregate(byColumn, aggMap))
   }
 
   def select(colNames: JArrayList[String]): PyDF  =
