@@ -474,7 +474,7 @@ object DF {
   def fromSparkDataFrame(sdf: DataFrame,
                          name: String,
                          options: Options = Options()): DF =
-    new DF(sdf, options, "fromSparkDataFrame: $name")
+    new DF(sdf, options, s"$name")
 
   /**
    * create a DF given column names and vectors of columns(not rows)

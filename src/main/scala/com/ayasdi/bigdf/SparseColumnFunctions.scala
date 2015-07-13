@@ -26,7 +26,8 @@ class SparseColumnFunctions(self: Column) {
     ks.foreach { k =>
       val sparseToDense = (sparse: Map[String, Float]) => sparse.getOrElse(k, 0.0F)
       val newCol = callUDF(sparseToDense, FloatType, self.df.get.sdf.col(self.name))
-      self.df.get.sdf = self.df.get.sdf.withColumn(s"${namePrefix}${k}", newCol)
+      val colName = s"${namePrefix}${k.replace(".", "_dot_")}"
+      self.df.get.sdf = self.df.get.sdf.withColumn(colName, newCol)
     }
   }
 
