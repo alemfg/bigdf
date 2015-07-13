@@ -180,6 +180,11 @@ class Column private[bigdf](var scol: SColumn,
   def mapOfStringToFloatRdd = getRdd[Map[String, Float]]
 
   /**
+   * get column as rdd of map from string to float for things like tfidf values of terms
+   */
+  def mapOfStringToLongRdd = getRdd[Map[String, Long]]
+
+  /**
    * get the RDD typecast to the given type
    * @tparam R
    * @return RDD of R's. throws exception if the cast is not applicable to this column

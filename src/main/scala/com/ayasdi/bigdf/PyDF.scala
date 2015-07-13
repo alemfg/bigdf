@@ -162,6 +162,7 @@ case class PyColumn(col: Column) {
    case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
    case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
    case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
+   case ColType.MapOfStringToLong => BigDFPyRDD.pythonRDD(col.mapOfStringToLongRdd)
    case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
  }
 //
