@@ -124,6 +124,7 @@ object SparkUtil {
     case ArrayType(DoubleType, _) => ColType.ArrayOfDouble
     case ArrayType(StringType, _) => ColType.ArrayOfString
     case MapType(StringType, FloatType, _) => ColType.MapOfStringToFloat
+    case MapType(StringType, LongType, _) => ColType.MapOfStringToLong
     case _ => throw new Exception(s"Unsupported type: $sqlType")
   }
 

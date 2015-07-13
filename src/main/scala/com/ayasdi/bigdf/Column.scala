@@ -47,6 +47,8 @@ object ColType {
    */
   case object MapOfStringToFloat extends EnumVal
 
+  case object MapOfStringToLong extends EnumVal
+
   case object Undefined extends EnumVal
 
 }
