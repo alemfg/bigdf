@@ -195,17 +195,6 @@ case class PyColumn(col: Column) {
 
 }
 
-object PyColumn {
-  def fromRDD[T: ClassTag](rdd: RDD[T]) = {
-    //FIXME: other types
-    val tpe = classTag[T]
-    if (tpe == classTag[Double]) PyColumn(Column(rdd.asInstanceOf[RDD[Double]]))
-    else if (tpe == classTag[String]) PyColumn(Column(rdd.asInstanceOf[RDD[String]]))
-    else null
-  }
-}
-
-
 case class PyPredicate(p: SColumn) {
   def And(that: PyPredicate) = {
     PyPredicate(this.p && that.p)

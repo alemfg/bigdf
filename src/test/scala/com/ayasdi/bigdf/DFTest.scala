@@ -270,9 +270,9 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Row index") {
-    //    val df = makeDF
-    //    val df2 = df.rowsByRange(1 until 2)
-    //    assert(df2("a").doubleRdd.collect() === Array(12.0, 13.0))
+    val df = makeDF
+    val df2 = df.rowSlice(1, 2)
+    assert(df2("a").doubleRdd.collect() === Array(11.0, 12.0))
   }
 
   test("Filter/Select: Double Column comparisons with Scalar") {

@@ -47,6 +47,8 @@ object ColType {
    */
   case object MapOfStringToFloat extends EnumVal
 
+  case object MapOfStringToLong extends EnumVal
+
   case object Undefined extends EnumVal
 
 }
@@ -265,16 +267,4 @@ object Column {
   implicit def column2DoubleRDD(col: Column): DoubleRDDFunctions = new DoubleRDDFunctions(col.doubleRdd)
   implicit def column2SparkColumnFunctions(col: Column): SparkColumnFunctions = new SparkColumnFunctions(col.scol)
   implicit def column2Expr(col: Column): Expression = new SparkColumnFunctions(col.scol).expr
-
-  /**
-   * create Column from existing RDD
-   */
-  def apply[T: ru.TypeTag](rdd: RDD[T], index: Int = -1, name: String = s"fromRdd") = {
-    val tpe = ru.typeOf[T]
-    val sqlContext = new SQLContext(rdd.sparkContext)
-    sqlContext.setConf("spark.sql.parquet.binaryAsString", "true")
-    val rows = rdd.map(Row(_))
-    val sdf = sqlContext.createDataFrame(rows, StructType(List(StructField(name, SparkUtil.typeTagToSql(tpe)))))
-    new Column(sdf.col(name), index, name, None)
-  }
 }
