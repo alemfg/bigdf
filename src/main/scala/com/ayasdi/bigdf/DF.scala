@@ -505,19 +505,15 @@ object DF {
     val colTypes = header.zip(vecs).map { case (colName, col) =>
       col(0) match {
         case c: Double =>
-          println(s"Column: ${colName} Type: Double")
           StructField(colName, DoubleType)
 
         case c: String =>
-          println(s"Column: ${colName} Type: String")
           StructField(colName, StringType)
 
         case cs: Array[String] =>
-          println(s"Column: $colName Type: Array[String]")
           StructField(colName, ArrayType(StringType))
 
         case kvs: mutable.Map[_, _] =>
-          println(s"Column: $colName Type: Map[_, _]")
           val kType = kvs.head._1 match {
             case _: String => StringType
             case _ => throw new IllegalArgumentException("not supported yet")

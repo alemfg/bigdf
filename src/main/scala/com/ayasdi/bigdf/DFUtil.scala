@@ -119,6 +119,7 @@ object SparkUtil {
     case DoubleType => ColType.Double
     case FloatType => ColType.Float
     case ShortType => ColType.Short
+    case IntegerType => ColType.Int
     case LongType => ColType.Long
     case StringType | BinaryType => ColType.String
     case ArrayType(DoubleType, _) => ColType.ArrayOfDouble
@@ -146,6 +147,7 @@ object SparkUtil {
     else if (tpe =:= ru.typeOf[String]) StringType
     else if (tpe =:= ru.typeOf[Long]) LongType
     else if (tpe =:= ru.typeOf[Short]) ShortType
+    else if (tpe =:= ru.typeOf[Int]) IntegerType
     else if (tpe =:= ru.typeOf[ArrayBuffer[Double]]) ArrayType(DoubleType)
     else if (tpe =:= ru.typeOf[ArrayBuffer[Float]]) ArrayType(FloatType)
     else if (tpe =:= ru.typeOf[ArrayBuffer[String]]) ArrayType(StringType)

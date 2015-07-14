@@ -34,6 +34,8 @@ object ColType {
 
   case object Short extends EnumVal
 
+  case object Int extends EnumVal
+
   case object Long extends EnumVal
 
   case object String extends EnumVal
@@ -65,19 +67,11 @@ class Column private[bigdf](var scol: SColumn,
                             var index: Int = -1,
                             var name: String = "anon",
                             var df: Option[DF] = None) {
-
-  /**
-   * set names for categories
-   * FIXME: this should be somewhere else not in Column
-   */
-  val catNameToNum: mutable.Map[String, Short] = new JHashMap[String, Short]
-  val catNumToName: mutable.Map[Short, String] = new JHashMap[Short, String]
-
   /**
    * count number of elements.
    */
   def count = {
-    require(!df.isEmpty, "Column is not in a DF")
+    require(df.nonEmpty, "Column is not in a DF")
     df.get.rowCount
   }
   val parseErrors = 0 //FIXME: sc.accumulator(0L)
@@ -94,15 +88,14 @@ class Column private[bigdf](var scol: SColumn,
   private[bigdf] def isString = sqlType == StringType
   private[bigdf] def isShort = sqlType == ShortType
   private[bigdf] def isLong = sqlType == LongType
+  private[bigdf] def isInt = sqlType == IntegerType
   private[bigdf] def isArrayOfString = sqlType == ArrayType(StringType)
   private[bigdf] def isArrayOfDouble = sqlType == ArrayType(DoubleType)
   private[bigdf] def isMapOfStringToFloat = sqlType == MapType(StringType, FloatType)
 
   lazy val csvWritable = isDouble || isFloat || isShort || isString || isLong
 
-  override def toString = {
-    s"scol: ${scol.toString()} index: $index type: $colType"
-  }
+  override def toString = s"scol: ${scol.toString()} index: $index type: $colType"
 
   override def equals(that: Any): Boolean = that match {
     case that: Column => that.scol.equals(this.scol)
@@ -112,9 +105,7 @@ class Column private[bigdf](var scol: SColumn,
   /**
    * get the upto max entries in the column as strings
    */
-  def head(max: Int): Array[String] = {
-    df.get.sdf.select(name).head(max).map(_.toString())
-  }
+  def head(max: Int): Array[String] = df.get.sdf.select(name).head(max).map(_.toString())
 
   /**
    * print upto max(default 10) elements
@@ -153,6 +144,11 @@ class Column private[bigdf](var scol: SColumn,
    * get column as rdd of shorts
    */
   def shortRdd = getRdd[Short]
+
+  /**
+   * get column as rdd of shorts
+   */
+  def intRdd = getRdd[Int]
 
   /**
    * get column as rdd of shorts
