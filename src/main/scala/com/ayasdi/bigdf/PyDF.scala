@@ -5,7 +5,7 @@
  */
 package com.ayasdi.bigdf
 
-import java.util.{ArrayList => JArrayList, HashMap => JHashMap}
+import java.util.{ArrayList => JArrayList, HashMap => JHashMap, List => JList}
 
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -89,6 +89,12 @@ case class PyDF(df: DF) {
   def aggregateMultiple(byColumnJ: JArrayList[String], aggMapJ: JHashMap[String, String]): PyDF = {
     val byColumn = byColumnJ.asScala.toList
     val aggMap = aggMapJ.toMap
+    PyDF(df.aggregate(byColumn, aggMap))
+  }
+
+  def aggregateMultiple(byColumnJ: JArrayList[String], aggMapJ: JList[(String, String)]): PyDF = {
+    val byColumn = byColumnJ.asScala.toList
+    val aggMap = aggMapJ.asScala.toList
     PyDF(df.aggregate(byColumn, aggMap))
   }
 

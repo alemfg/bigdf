@@ -285,13 +285,22 @@ class DF private(var sdf: DataFrame,
    * @param aggdCols map of columns to be aggregated and their aggregation functions
    * @return new DF with first column aggByCol and second aggedCol
    */
-  def aggregate(aggByCols: Seq[String], aggdCols: Map[String, String]): DF = {
+  def aggregate(aggByCols: Seq[String], aggdCols: Map[String, String]): DF =
+    aggregate(aggByCols, aggdCols.toSeq)
+
+  /**
+   * aggregate multiple columns after grouping by multiple other columns
+   * @param aggByCols sequence of columns to group by
+   * @param aggdCols seq of tuples of column name and aggregation function
+   * @return new DF with first column aggByCol and second aggedCol
+   */
+  def aggregate(aggByCols: Seq[String], aggdCols: Seq[(String, String)]): DF = {
     val aggdExprs = aggdCols.map { case (colName, aggtor) =>
       strToExpr(aggtor)(sdf(colName))
-    }.toSeq
+    }
 
     val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdExprs.head, aggdExprs.tail : _*)
-    new DF(aggdSdf, options, s"aggd:$name")
+    new DF(aggdSdf, options, s"aggd[$name]")
   }
 
   /**
@@ -429,7 +438,7 @@ object DF {
       .withParserLib("UNIVOCITY")
       .csvFile(sqlContext, inFile)
 
-    new DF(sdf, options, "fromCSV: $inFile")
+    new DF(sdf, options, s"fromCSV_$inFile")
   }
 
   /**
@@ -468,7 +477,7 @@ object DF {
         field.dataType == ShortType
     }, s"${sdf.schema.fields}")
 
-    new DF(sdf, options, "fromParquet: $inFile")
+    new DF(sdf, options, s"fromParquet_$inFile")
   }
 
   def fromSparkDataFrame(sdf: DataFrame,

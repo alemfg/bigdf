@@ -444,16 +444,20 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   test("Aggregate: multiple") {
     val df = makeDFFromCSVFile("src/test/resources/aggregate.csv")
     df.list()
-    val aggd = df.aggregate(List("Customer", "Month"), Map("Feature1" -> "Sum",  "Feature1" -> "Mean",
-      "Feature2" -> "Mean",
-      "Day" -> "Frequency"))
-    aggd.list()
 
-    assert(aggd.columnCount === 5)
+    val aggd = df.aggregate(List("Customer", "Month"),
+      Sum(df("Feature1")), Average(df("Feature1")), Average(df("Feature2")), Frequency(df("Day")))
+    aggd.list()
+    assert(aggd.columnCount === 6)
     assert(aggd(aggd("Customer") === "Mohit Jaggi" && aggd("Month") === 2.0)
       .first().get(2) === 9.0)
     assert(aggd(aggd("Customer") === "Jack Jill" && aggd("Month") === 1.0)
-      .first().get(3) === 77.0)
+      .first().get(4) === 77.0)
+
+    val aggd1 = df.aggregate(List("Customer", "Month"),
+      List(("Feature1", "Sum"), ("Feature1", "Mean"), ("Feature2", "Mean"), ("Day", "Frequency")))
+    aggd1.list()
+    assert(aggd1.collect() === aggd.collect())
   }
 
   test ("Column utils: first, distinct") {
