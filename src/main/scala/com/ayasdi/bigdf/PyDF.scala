@@ -185,18 +185,34 @@ case class PyColumn(col: Column) {
     PyColumn(col + v)
   }
 
+  def add(c: PyColumn) = {
+    PyColumn(col + c.col)
+  }
+  
   def sub(v: Double) = {
     PyColumn(col - v)
+  }
+
+  def sub(c: PyColumn) = {
+    PyColumn(col - c.col)
   }
 
   def mul(v: Double) = {
     PyColumn(col * v)
   }
 
+  def mul(c: PyColumn) = {
+    PyColumn(col * c.col)
+  }
+  
   def div(v: Double) = {
     PyColumn(col / v)
   }
 
+  def div(c: PyColumn) = {
+    PyColumn(col / c.col)
+  }
+  
 }
 
 case class PyPredicate(p: SColumn) {
