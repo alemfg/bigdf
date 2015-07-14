@@ -32,8 +32,7 @@ case class PyDF(df: DF) {
 
   def deleteColumn(colName: String) = df.delete(colName)
 
-  def describe(colNames: JArrayList[String]) =
-    df.describe(colNames.asScala.toList:_*)
+  def describe(colNames: JArrayList[String]) = df.describe(colNames.asScala.toList:_*)
 
   def colCount = df.columnCount
 
@@ -44,46 +43,24 @@ case class PyDF(df: DF) {
   //   PyDF(df.rowsByRange(r))
   // }
 
-  def rename(columns: JHashMap[String, String], inPlace: Boolean) =
-    df.rename(columns.toMap, inPlace)
+  def rename(columns: JHashMap[String, String], inPlace: Boolean) = df.rename(columns.toMap, inPlace)
 
   def list(numRows: Int, numCols: Int) = df.list(numRows, numCols)
 
-  def where(predicate: PyPredicate): PyDF = {
-    PyDF(df.where(predicate.p))
-  }
+  def where(predicate: PyPredicate): PyDF = PyDF(df.where(predicate.p))
 
-  def update(name: String, pycol: PyColumn): Unit = {
-    df.update(name, pycol.col)
-  }
+  def update(name: String, pycol: PyColumn): Unit = df.update(name, pycol.col)
 
-  def compareSchema(a: PyDF, b: PyDF) =
-    DF.compareSchema(a.df, b.df)
+  def compareSchema(a: PyDF, b: PyDF) = DF.compareSchema(a.df, b.df)
 
-  def join(sc: SparkContext, left: PyDF, right: PyDF, on: String, how: String) = {
+  def join(sc: SparkContext, left: PyDF, right: PyDF, on: String, how: String) =
     PyDF(left.df.join(right.df, on, how))
-  }
 
   def aggregate(byColumnJ: JArrayList[String], aggrColumnJ: JArrayList[String], aggregator: String): PyDF = {
     val byColumn = byColumnJ.asScala.toList
     val aggrColumn = aggrColumnJ.asScala.toList
     val aggMap = Map(aggrColumn.head -> aggregator)
-    val dfAgg = aggregator match {
-      case "Mean" => df.aggregate(byColumn, aggMap)
-      case "Sum" => df.aggregate(byColumn, aggMap)
-      case "Frequency" => df.aggregate(byColumn, aggMap)
-      case "Min" => df.aggregate(byColumn, aggMap)
-      case "Max" => df.aggregate(byColumn, aggMap)
-      case "StdDev" => df.aggregate(byColumn, aggMap)        
-      case "Count" => {
-        df(aggrColumn.head).colType match {
-          case ColType.Double => df.aggregate(byColumn, aggMap)
-          case ColType.String => df.aggregate(byColumn, aggMap)
-          case _ => throw new IllegalArgumentException("Count not yet supported for this column type")
-        }
-      }
-      case _ => null
-    }
+    val dfAgg = df.aggregate(byColumn, aggMap)
     PyDF(dfAgg)
   }
 
@@ -99,8 +76,7 @@ case class PyDF(df: DF) {
     PyDF(df.aggregate(byColumn, aggMap))
   }
 
-  def select(colNames: JArrayList[String]): PyDF  =
-    PyDF(df.select(colNames.head, colNames.tail : _ *))
+  def select(colNames: JArrayList[String]): PyDF  = PyDF(df.select(colNames.head, colNames.tail : _ *))
 
   def groupBy(colName: String) = df.groupBy(colName)
 
@@ -110,8 +86,7 @@ case class PyDF(df: DF) {
     this
   }
 
-  def writeToCSV(file: String, separator: String, singlePart: Boolean,
-    cols: JArrayList[String]): Unit =
+  def writeToCSV(file: String, separator: String, singlePart: Boolean, cols: JArrayList[String]): Unit =
     df.writeToCSV(file, separator, singlePart, cols.asScala.toList)
 
   def writeToParquet(file: String, cols: JArrayList[String]): Unit =
@@ -131,6 +106,7 @@ object PyDF {
   def readParquet(sc: SparkContext, infile: String): PyDF = {
     PyDF(DF.fromParquet(sc, infile, Options()))
   }
+
   def fromSparkDF(sdf: DataFrame, name: String): PyDF = {
     PyDF(DF.fromSparkDataFrame(sdf, name, Options()))
   }
