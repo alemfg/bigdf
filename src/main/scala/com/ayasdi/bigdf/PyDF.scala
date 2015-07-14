@@ -143,6 +143,7 @@ case class PyColumn(col: Column) {
    case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
    case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
    case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
+   case ColType.Int => BigDFPyRDD.pythonRDD(col.intRdd)
    case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
    case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
    case ColType.MapOfStringToLong => BigDFPyRDD.pythonRDD(col.mapOfStringToLongRdd)
