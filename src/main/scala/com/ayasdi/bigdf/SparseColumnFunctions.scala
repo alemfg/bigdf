@@ -9,10 +9,10 @@ import java.util.{HashSet => JHashSet}
 
 import scala.collection.JavaConversions.asScalaSet
 import scala.collection.mutable
-
 import scala.reflect.runtime.{universe => ru}
+
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.FloatType
+import org.apache.spark.sql.types.{FloatType, LongType}
 
 class SparseColumnFunctions(self: Column) {
 
@@ -34,8 +34,15 @@ class SparseColumnFunctions(self: Column) {
     }
 
     ks.foreach { k =>
-      val sparseToDense = (sparse: Map[String, Float]) => sparse.getOrElse(k, 0.0F)
-      val newCol = callUDF(sparseToDense, FloatType, self.df.get.sdf.col(self.name))
+      val newCol = self.colType match {
+        case ColType.MapOfStringToFloat =>
+          val sparseToDense = (sparse: Map[String, Float]) => sparse.getOrElse(k, 0.0F)
+          callUDF(sparseToDense, FloatType, self.df.get.sdf.col(self.name))
+        case ColType.MapOfStringToLong =>
+          val sparseToDense = (sparse: Map[String, Long]) => sparse.getOrElse(k, 0L)
+          callUDF(sparseToDense, LongType, self.df.get.sdf.col(self.name))
+        case _ => throw new IllegalStateException("can't get here")
+      }
       val colName = s"${namePrefix}${k.replace(".", "_dot_")}"
       self.df.get.sdf = self.df.get.sdf.withColumn(colName, newCol)
     }
