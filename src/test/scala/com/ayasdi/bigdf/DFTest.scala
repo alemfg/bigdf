@@ -485,7 +485,12 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df("groupByThis") = df("a").map[String, String](x => "hey")
     df.list()
     val tfs = df.aggregate(List("groupByThis"), Frequency(df("a")))
-    println(tfs.first())
+    val fs = tfs.first().get(1).asInstanceOf[Map[String, Long]]
+    assert(fs("11.0") == 1 && fs("12.0") == 1 && fs("13.0") == 1)
+    tfs("Frequency(a)").expand(tfs)
+    tfs.list()
+    tfs.printSchema()
+    assert(tfs.first().get(2) == 1 && tfs.first().get(3) == 1 && tfs.first().get(4) == 1)
   }
 
   test("Join") {
