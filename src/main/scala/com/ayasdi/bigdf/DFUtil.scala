@@ -153,7 +153,7 @@ object SparkUtil {
     else if (tpe =:= ru.typeOf[ArrayBuffer[String]]) ArrayType(StringType)
     else if (tpe =:= ru.typeOf[Map[String, Float]]) MapType(StringType, FloatType)
     else if (tpe =:= ru.typeOf[mutable.Map[String, Float]]) MapType(StringType, FloatType)
-    else if (tpe =:= ru.typeOf[Map[String, Long]]) MapType(StringType, FloatType)
+    else if (tpe =:= ru.typeOf[Map[String, Long]]) MapType(StringType, LongType)
     else if (tpe =:= ru.typeOf[mutable.Map[String, Long]]) MapType(StringType, LongType)
     else throw new IllegalArgumentException(s"Type not supported: $tpe")
 
