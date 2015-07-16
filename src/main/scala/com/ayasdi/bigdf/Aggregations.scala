@@ -29,8 +29,8 @@ case class Frequency(child: Expression) extends PartialAggregate with trees.Unar
   override def toString = s"Frequency($child)"
 
   override def asPartial = {
-    val partialTF2 = Alias(Frequency(child), "PartialFrequency")()
-    SplitEvaluation(SparseSum(partialTF2.toAttribute), partialTF2 :: Nil)
+    val partialFrequency = Alias(Frequency(child), "PartialFrequency")()
+    SplitEvaluation(SparseSum(partialFrequency.toAttribute), partialFrequency :: Nil)
   }
 
   override def newInstance(): FrequencyFunction = FrequencyFunction(child, this)
