@@ -296,10 +296,11 @@ class DF private(var sdf: DataFrame,
    */
   def aggregate(aggByCols: Seq[String], aggdCols: Seq[(String, String)]): DF = {
     val aggdExprs = aggdCols.map { case (colName, aggtor) =>
-      strToExpr(aggtor)(sdf(colName))
+      SparkColumnFunctions(Alias(new SparkColumnFunctions(strToExpr(aggtor)(sdf(colName))).expr,
+        s"$aggtor[$colName]")())
     }
 
-    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail: _*).agg(aggdExprs.head, aggdExprs.tail : _*)
+    val aggdSdf = sdf.groupBy(aggByCols.head, aggByCols.tail : _*).agg(aggdExprs.head, aggdExprs.tail : _*)
     new DF(aggdSdf, options, s"aggd[$name]")
   }
 
