@@ -17,6 +17,7 @@ import org.apache.spark.sql.{Column => SColumn, DataFrame}
 import org.apache.spark.{BigDFPyRDD, SparkContext}
 import com.ayasdi.bigdf.Implicits._
 import com.databricks.spark.csv.CSVParsingOpts
+import com.ayasdi.bigdf.ColType.EnumVal
 
 case class PyDF(df: DF) {
   def sdf = df.sdf
@@ -98,6 +99,13 @@ object PyDF {
     PyDF(DF.fromCSVFile(sc, name,
       options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
 
+  def fromCSVWithSchema(sc: SparkContext, name: String, separator: String,
+    fasterGuess: Boolean, nParts: Int, schema:JHashMap[String, EnumVal]): PyDF =
+    PyDF(DF.fromCSVFile(sc, name,
+      options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0))),
+      schema=schema.toMap
+    ))
+  
   def fromCSVDir(sc: SparkContext, name: String, pattern: String, recursive: Boolean, separator: String) =
     PyDF(DF.fromCSVDir(sc, name, pattern, recursive,
       options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
@@ -245,4 +253,10 @@ object TypeTagUtil {
 object OrderingUtil {
   val double = scala.math.Ordering.Double
   val string = scala.math.Ordering.String  
+}
+
+object ColTypeUtil {
+  val String = com.ayasdi.bigdf.ColType.String
+  val Float = com.ayasdi.bigdf.ColType.Float
+  val Long = com.ayasdi.bigdf.ColType.Long
 }
