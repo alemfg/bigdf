@@ -5,6 +5,9 @@
  */
 package com.ayasdi.bigdf
 
+import java.util.{HashMap => JHashMap}
+
+import scala.collection.JavaConversions.mapAsScalaMap
 import scala.collection.immutable.Range.Inclusive
 import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
@@ -16,7 +19,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column => SColumn, Row, _}
 import com.ayasdi.bigdf.ColType.EnumVal
-import com.databricks.spark.csv.{CSVParsingOpts, CsvParser => SParser, CsvSchemaRDD}
+import com.databricks.spark.csv.{CsvParser => SParser, CsvSchemaRDD, CSVParsingOpts}
 
 /**
  * A DF is a "list of vectors of equal length". It is a 2-dimensional tabular
@@ -30,6 +33,18 @@ class DF private(var sdf: DataFrame,
                  val name: String) {
 
   if(options.perfTuningOpts.cache) sdf.cache()
+
+  val stringToIntMaps : mutable.Map[String, mutable.Map[String, Int]] =
+    new JHashMap[String, mutable.Map[String, Int]]()
+
+  def printStringToIntMaps(): Unit = {
+    stringToIntMaps.foreach { case (colName, map) =>
+      println(s"colName: $colName")
+      map.foreach { case (k, v) =>
+        println(s"    k: $k -> v: $v")
+      }
+    }
+  }
 
   /**
    * number of rows in df, this cannot change. any operation that changes this returns a new df
@@ -108,6 +123,8 @@ class DF private(var sdf: DataFrame,
     rdd
   }
 
+
+
   /**
    * save the DF to a text file
    * @param file save DF in this file
@@ -122,7 +139,9 @@ class DF private(var sdf: DataFrame,
       case true => sdf.coalesce(1)
       case _ => sdf
     }
-    new CsvSchemaRDD(dfToWrite).saveAsCsvFile(file, Map("delimiter" -> separator, "header" -> "true"))
+    new CsvSchemaRDD(dfToWrite).saveAsCsvFile(file,
+      parameters = Map("delimiter" -> separator, "header" -> "true"),
+      sparseColInfo = stringToIntMaps)
   }
 
   /**
@@ -393,10 +412,8 @@ object DF {
    * For CSV/TSV files only numeric(for now only Double) and String data types are supported
    * @param sc The spark context
    * @param inFile Full path to the input CSV/TSV file. If running on cluster, it should be accessible on all nodes
-   * @param separator The field separator e.g. ',' for CSV file
-   * @param nParts number of parts to process in parallel
    */
-  def apply(sc: SparkContext, inFile: String, separator: Char, nParts: Int, options: Options): DF = {
+  def apply(sc: SparkContext, inFile: String, options: Options): DF = {
     if (FileUtils.isDir(inFile)(sc)) fromCSVDir(sc, inFile, ".*", true, options)
     else fromCSVFile(sc, inFile, options = options)
   }
