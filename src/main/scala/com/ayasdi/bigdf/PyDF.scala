@@ -15,6 +15,7 @@ import scala.reflect.runtime.{universe => ru}
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.sql.{Column => SColumn, DataFrame}
 import org.apache.spark.{BigDFPyRDD, SparkContext}
+import com.ayasdi.bigdf.ColType.EnumVal
 import com.ayasdi.bigdf.Implicits._
 import com.databricks.spark.csv.CSVParsingOpts
 
@@ -26,18 +27,18 @@ case class PyDF(df: DF) {
   def column(name: String) = PyColumn(df.column(name))
 
   def expandMapColumn(name: String, namePrefix: String) =
-    df.column(name).expand(df, null, namePrefix)
-  
-  def columnByIndex(index: Int) = PyColumn(df.column(index))  
+    df.column(name).expand(null, namePrefix)
+
+  def columnByIndex(index: Int) = PyColumn(df.column(index))
 
   def deleteColumn(colName: String) = df.delete(colName)
 
-  def describe(colNames: JArrayList[String]) = df.describe(colNames.asScala.toList:_*)
+  def describe(colNames: JArrayList[String]) = df.describe(colNames.asScala.toList: _*)
 
   def colCount = df.columnCount
 
   def rowCount = df.rowCount
-  
+
   def rowSlice(start: Int, end: Int) = {
     PyDF(df.rowSlice(start, end))
   }
@@ -75,13 +76,13 @@ case class PyDF(df: DF) {
     PyDF(df.aggregate(byColumn, aggMap))
   }
 
-  def select(colNames: JArrayList[String]): PyDF  = PyDF(df.select(colNames.head, colNames.tail : _ *))
+  def select(colNames: JArrayList[String]): PyDF = PyDF(df.select(colNames.head, colNames.tail: _ *))
 
   def groupBy(colName: String) = df.groupBy(colName)
 
   def pivot(keyCol: String, pivotByCol: String,
             pivotedCols: JArrayList[String]): PyDF = {
-   // PyDF(df.pivot(keyCol, pivotByCol, pivotedCols.asScala.toList))
+    // PyDF(df.pivot(keyCol, pivotByCol, pivotedCols.asScala.toList))
     this
   }
 
@@ -101,13 +102,11 @@ object PyDF {
         csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
 
   def fromCSVWithSchema(sc: SparkContext, name: String, separator: String,
-    fasterGuess: Boolean, nParts: Int, schema:JHashMap[String, ColType.EnumVal], cache: Boolean): PyDF =
+                        fasterGuess: Boolean, nParts: Int, schema: JHashMap[String, EnumVal]): PyDF =
     PyDF(DF.fromCSVFile(sc, name,
-      options = Options(perfTuningOpts=PerfTuningOpts(cache),
-        csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0))),
-      schema=schema.toMap
-    ))
-  
+      options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0), numParts = nParts)),
+      schema = schema.toMap))
+
   def fromCSVDir(sc: SparkContext, name: String, pattern: String, recursive: Boolean, separator: String) =
     PyDF(DF.fromCSVDir(sc, name, pattern, recursive,
       options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
@@ -123,18 +122,29 @@ object PyDF {
 
 case class PyColumn(col: Column) {
   def list(numRows: Int) = col.list(numRows)
+
   def head(numRows: Int) = col.head(numRows)
+
   def count = col.count
 
   def mean = col.mean()
+
   def max = col.doubleRdd.max()
+
   def min = col.doubleRdd.min()
+
   def stddev = col.stdev()
+
   def variance = col.variance()
+
   def histogram(nBuckets: Int) = col.histogram(nBuckets)
+
   def first = col.first().get(0)
+
   def distinct = col.distinct.collect().map(_.get(0))
+
   def sum = col.sum()
+
   def stats = col.stats()
 
   override def toString = {
@@ -143,30 +153,32 @@ case class PyColumn(col: Column) {
   }
 
   def name = col.name
+
   def tpe = s"${col.colType}"
 
- def javaToPython: JavaRDD[Array[Byte]] = col.colType match {
-   case ColType.Double => BigDFPyRDD.pythonRDD(col.doubleRdd)
-   case ColType.String => BigDFPyRDD.pythonRDD(col.stringRdd)
-   case ColType.Float => BigDFPyRDD.pythonRDD(col.floatRdd)
-   case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
-   case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
-   case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
-   case ColType.Int => BigDFPyRDD.pythonRDD(col.intRdd)
-   case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
-   case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
-   case ColType.MapOfStringToLong => BigDFPyRDD.pythonRDD(col.mapOfStringToLongRdd)
-   case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
- }
-//
-//  def pythonToJava[T: ClassTag](c: JavaRDD[Array[Byte]]): PyColumn[Any] = {
-//    //FIXME: other types
-//    val jrdd: JavaRDD[T] = BigDFPyRDD.javaRDD(c)
-//    val tpe = classTag[T]
-//    if (tpe == classTag[Double]) PyColumn[Double](Column(jrdd.rdd.asInstanceOf[RDD[Double]]))
-//    else if (tpe == classTag[String]) PyColumn(Column(jrdd.rdd.asInstanceOf[RDD[String]]))
-//    else null
-//  }
+  def javaToPython: JavaRDD[Array[Byte]] = col.colType match {
+    case ColType.Double => BigDFPyRDD.pythonRDD(col.doubleRdd)
+    case ColType.String => BigDFPyRDD.pythonRDD(col.stringRdd)
+    case ColType.Float => BigDFPyRDD.pythonRDD(col.floatRdd)
+    case ColType.ArrayOfDouble => BigDFPyRDD.pythonRDD(col.arrayOfDoubleRdd)
+    case ColType.ArrayOfString => BigDFPyRDD.pythonRDD(col.arrayOfStringRdd)
+    case ColType.Short => BigDFPyRDD.pythonRDD(col.shortRdd)
+    case ColType.Int => BigDFPyRDD.pythonRDD(col.intRdd)
+    case ColType.Long => BigDFPyRDD.pythonRDD(col.longRdd)
+    case ColType.MapOfStringToFloat => BigDFPyRDD.pythonRDD(col.mapOfStringToFloatRdd)
+    case ColType.MapOfStringToLong => BigDFPyRDD.pythonRDD(col.mapOfStringToLongRdd)
+    case ColType.Undefined => throw new IllegalArgumentException("Undefined column type")
+  }
+
+  //
+  //  def pythonToJava[T: ClassTag](c: JavaRDD[Array[Byte]]): PyColumn[Any] = {
+  //    //FIXME: other types
+  //    val jrdd: JavaRDD[T] = BigDFPyRDD.javaRDD(c)
+  //    val tpe = classTag[T]
+  //    if (tpe == classTag[Double]) PyColumn[Double](Column(jrdd.rdd.asInstanceOf[RDD[Double]]))
+  //    else if (tpe == classTag[String]) PyColumn(Column(jrdd.rdd.asInstanceOf[RDD[String]]))
+  //    else null
+  //  }
 
   def add(v: Double) = {
     PyColumn(col + v)
@@ -175,7 +187,7 @@ case class PyColumn(col: Column) {
   def add(c: PyColumn) = {
     PyColumn(col + c.col)
   }
-  
+
   def sub(v: Double) = {
     PyColumn(col - v)
   }
@@ -191,7 +203,7 @@ case class PyColumn(col: Column) {
   def mul(c: PyColumn) = {
     PyColumn(col * c.col)
   }
-  
+
   def div(v: Double) = {
     PyColumn(col / v)
   }
@@ -199,7 +211,7 @@ case class PyColumn(col: Column) {
   def div(c: PyColumn) = {
     PyColumn(col / c.col)
   }
-  
+
 }
 
 case class PyPredicate(p: SColumn) {
@@ -254,7 +266,7 @@ object TypeTagUtil {
 
 object OrderingUtil {
   val double = scala.math.Ordering.Double
-  val string = scala.math.Ordering.String  
+  val string = scala.math.Ordering.String
 }
 
 object ColTypeUtil {
