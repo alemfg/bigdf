@@ -17,7 +17,6 @@ import org.apache.spark.sql.{Column => SColumn, DataFrame}
 import org.apache.spark.{BigDFPyRDD, SparkContext}
 import com.ayasdi.bigdf.Implicits._
 import com.databricks.spark.csv.CSVParsingOpts
-import com.ayasdi.bigdf.ColType.EnumVal
 
 case class PyDF(df: DF) {
   def sdf = df.sdf
@@ -95,14 +94,17 @@ case class PyDF(df: DF) {
 }
 
 object PyDF {
-  def fromCSV(sc: SparkContext, name: String, separator: String, fasterGuess: Boolean, nParts: Int): PyDF =
+  def fromCSV(sc: SparkContext, name: String, separator: String,
+    fasterGuess: Boolean, nParts: Int, cache: Boolean): PyDF =
     PyDF(DF.fromCSVFile(sc, name,
-      options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
+      options = Options(perfTuningOpts=PerfTuningOpts(cache),
+        csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
 
   def fromCSVWithSchema(sc: SparkContext, name: String, separator: String,
-    fasterGuess: Boolean, nParts: Int, schema:JHashMap[String, EnumVal]): PyDF =
+    fasterGuess: Boolean, nParts: Int, schema:JHashMap[String, ColType.EnumVal], cache: Boolean): PyDF =
     PyDF(DF.fromCSVFile(sc, name,
-      options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0))),
+      options = Options(perfTuningOpts=PerfTuningOpts(cache),
+        csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0))),
       schema=schema.toMap
     ))
   
