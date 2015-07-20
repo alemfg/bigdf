@@ -14,7 +14,7 @@ import scala.reflect.runtime.{universe => ru}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{ArrayType, FloatType, LongType}
 
-class SparseColumnFunctions(self: Column) {
+class SparseColumnSet(self: Column) {
 
   private def stringToInt(ks: mutable.Set[String]): mutable.Map[String, Int] = {
     val size = ks.size
@@ -45,7 +45,8 @@ class SparseColumnFunctions(self: Column) {
       }
     }
 
-    self.df.get.stringToIntMaps(s"_e_${self.name}") = stringToInt(ks)
+    val name2Index = stringToInt(ks)
+    self.df.get.stringToIntMaps(s"_e_${self.name}") = name2Index
 
     val newCol = self.colType match {
       case ColType.MapOfStringToFloat =>
@@ -53,8 +54,8 @@ class SparseColumnFunctions(self: Column) {
           val data = new Array[Float](ks.size)
           var i = 0
           ks.foreach { k =>
+            i = name2Index(k)
             data(i) = sparse.getOrElse(k, 0.0F)
-            i += 1
           }
           data
         }
@@ -64,8 +65,8 @@ class SparseColumnFunctions(self: Column) {
           val data = new Array[Long](ks.size)
           var i = 0
           ks.foreach { k =>
+            i = name2Index(k)
             data(i) = sparse.getOrElse(k, 0L)
-            i += 1
           }
           data
         }

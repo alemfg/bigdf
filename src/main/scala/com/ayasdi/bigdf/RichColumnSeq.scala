@@ -36,7 +36,7 @@ case class RichColumnSeq(cols: Seq[Column]) {
    * apply a given function to a column to generate a new column
    * the new column does not belong to any DF automatically
    */
-  def map[RT: ru.TypeTag, A1: ru.TypeTag](mapper: A1 => RT) = {
+  def maap[RT: ru.TypeTag, A1: ru.TypeTag](mapper: A1 => RT) = {
     require(cols.length == 1)
     val newCol = callUDF(mapper, SparkUtil.typeTagToSql(ru.typeOf[RT]), df.sdf(cols(0).name))
     new Column(newCol)
@@ -46,7 +46,7 @@ case class RichColumnSeq(cols: Seq[Column]) {
    * apply a given function to 2 columns to generate a new column
    * the new column does not belong to any DF automatically
    */
-  def map[RT: ru.TypeTag, A1: ru.TypeTag, A2: ru.TypeTag](mapper: (A1, A2) => RT) = {
+  def maap[RT: ru.TypeTag, A1: ru.TypeTag, A2: ru.TypeTag](mapper: (A1, A2) => RT) = {
     require(cols.length == 2)
     val newCol = callUDF(mapper, SparkUtil.typeTagToSql(ru.typeOf[RT]),
       df.sdf(cols(0).name),
