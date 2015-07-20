@@ -102,9 +102,12 @@ object PyDF {
         csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0)))))
 
   def fromCSVWithSchema(sc: SparkContext, name: String, separator: String,
-                        fasterGuess: Boolean, nParts: Int, schema: JHashMap[String, EnumVal]): PyDF =
+    fasterGuess: Boolean, nParts: Int, schema: JHashMap[String, EnumVal],
+    cache: Boolean
+  ): PyDF =
     PyDF(DF.fromCSVFile(sc, name,
-      options = Options(csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0), numParts = nParts)),
+      options = Options(perfTuningOpts=PerfTuningOpts(cache),
+        csvParsingOpts = CSVParsingOpts(delimiter = separator.charAt(0), numParts = nParts)),
       schema = schema.toMap))
 
   def fromCSVDir(sc: SparkContext, name: String, pattern: String, recursive: Boolean, separator: String) =
