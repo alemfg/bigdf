@@ -17,7 +17,6 @@ import org.apache.spark.sql.catalyst.trees
 import org.apache.spark.sql.types.DataType
 import org.apache.spark.sql.{Column => SColumn}
 import org.apache.spark.{SparkConf, SparkContext, SparkException}
-import com.ayasdi.bigdf.Implicits._
 import com.databricks.spark.csv.{LineExceptionPolicy, LineParsingOpts}
 
 class DFTest extends FunSuite with BeforeAndAfterAll {
@@ -74,7 +73,7 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     val v = Vector(Vector("11.0", "12.0", "13.0"),
       Vector(21.0, 22.0, 23.0),
       Vector(31.0, 32.0, 33.0),
-      Vector(mutable.Map("a" -> 1L), mutable.Map("a" -> 2L, "b" -> 0L), mutable.Map("b" -> 1L, "c" -> 10L)))
+      Vector(mutable.Map("aa" -> 1L), mutable.Map("aa" -> 2L, "bb" -> 0L), mutable.Map("bb" -> 1L, "cc" -> 10L)))
     DF(sc, h, v, "makeDFWithSparseCols", Options())
   }
 
@@ -404,9 +403,9 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
 
   test("Column Ops: New column as custom function of existing ones") {
     val df = makeDF
-    df("new") = RichColumnSeq(df("a", "b")).map(TestFunctions2.summer _)
+    df("new") = df("a", "b").maap(TestFunctions2.summer _)
     df.list()
-    df("new2") = RichColumnSeq(df("a", "b")).map { (x: Double, y: Double) => x + y }
+    df("new2") = df("a", "b").maap { (x: Double, y: Double) => x + y }
 
     assert(df("new").doubleRdd.first === 21 + 11)
     assert(df("new2").doubleRdd.first === 21 + 11)
@@ -474,10 +473,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     val aggd = df.aggregate(List("groupByThis"), SparseSum(df("Sparse")))
     aggd.list()
     println(aggd.first())
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("b").get === 1)
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("a").get === 3)
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("c").get === 10)
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("d").isEmpty)
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("bb").get === 1)
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("aa").get === 3)
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("cc").get === 10)
+    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("dd").isEmpty)
   }
 
   test("Expand") {
@@ -486,7 +485,18 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df("Sparse").expand()
     df.list()
     df.printStringToIntMaps()
-    df.writeToCSV("/tmp/xyz", singlePart = true)
+    df.delete("Sparse")
+    val fileName = "/tmp/exp123.csv"
+    FileUtils.removeAll(fileName)
+    df.writeToCSV(fileName)
+    val df2 = DF.fromCSVFile(sc, fileName)
+    df2.list()
+    val aa = df2("aa").doubleRdd.collect()
+    assert(aa === Array(1.0, 2.0, 0.0))
+    val bb = df2("bb").doubleRdd.collect()
+    assert(bb === Array(0.0, 0.0, 1.0))
+    val cc = df2("cc").doubleRdd.collect()
+    assert(cc === Array(0.0, 0.0, 10.0))
   }
 
   test("Aggregate: Frequency") {

@@ -41,7 +41,7 @@ class DF private(var sdf: DataFrame,
     stringToIntMaps.foreach { case (colName, map) =>
       println(s"colName: $colName")
       map.foreach { case (k, v) =>
-        println(s"    k: $k -> v: $v")
+        println(s"    $k -> $v")
       }
     }
   }
@@ -140,7 +140,7 @@ class DF private(var sdf: DataFrame,
       case _ => sdf
     }
     new CsvSchemaRDD(dfToWrite).saveAsCsvFile(file,
-      parameters = Map("delimiter" -> separator, "header" -> "true"),
+      parameters = Map("delimiter" -> separator, "header" -> "true", "headerPerPart" -> "false"),
       sparseColInfo = stringToIntMaps)
   }
 

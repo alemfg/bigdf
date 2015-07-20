@@ -16,7 +16,6 @@ import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.sql.{Column => SColumn, DataFrame}
 import org.apache.spark.{BigDFPyRDD, SparkContext}
 import com.ayasdi.bigdf.ColType.EnumVal
-import com.ayasdi.bigdf.Implicits._
 import com.databricks.spark.csv.CSVParsingOpts
 
 case class PyDF(df: DF) {

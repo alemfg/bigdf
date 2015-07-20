@@ -5,22 +5,10 @@
  */
 package com.ayasdi.bigdf
 
-import scala.reflect.runtime.{universe => ru}
 import scala.language.dynamics
+import scala.reflect.runtime.{universe => ru}
+
 import org.apache.spark.sql.{Column => SColumn}
-
-/**
- * Import these implicit conversions to access the Scala DSL
- */
-object Implicits {
-  import scala.language.implicitConversions
-
-  implicit def columnAnyToRichColumnMap(col: Column): SparseColumnFunctions = new SparseColumnFunctions(col)
-
-  implicit def columnSeqToRichColumnSeq(cols: Seq[Column]): RichColumnSeq = new RichColumnSeq(cols)
-
-  implicit def dfToRichDF(df: DF): RichDF = new RichDF(df)
-}
 
 case class RichDF(self: DF) extends Dynamic {
   /**
@@ -67,7 +55,7 @@ case class RichDF(self: DF) extends Dynamic {
    * update a column, add or replace
    */
   def update(colName: String, that: Column): Unit = {
-     self.setColumn(colName, that)
+    self.setColumn(colName, that)
   }
 
   /**
