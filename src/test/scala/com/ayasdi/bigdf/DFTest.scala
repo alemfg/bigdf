@@ -473,18 +473,20 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     val aggd = df.aggregate(List("groupByThis"), SparseSum(df("Sparse")))
     aggd.list()
     println(aggd.first())
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("bb").get === 1)
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("aa").get === 3)
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("cc").get === 10)
-    assert(aggd.first().get(1).asInstanceOf[Map[String, Long]].get("dd").isEmpty)
+
+    assert(aggd("SparseSum[Sparse].aa").longRdd.first === 3)
+    assert(aggd("SparseSum[Sparse].bb").longRdd.first === 1)
+    assert(aggd("SparseSum[Sparse].cc").longRdd.first === 10)
+    assert(aggd("SparseSum[Sparse].dd").longRdd.first === 0)
   }
 
-  test("Expand") {
+  test("Expand and save to CSV") {
     val df = makeDFWithSparseCols
     df.list()
     df("Sparse").expand()
     df.list()
     df.printStringToIntMaps()
+    println(df("_e_Sparse").getItem(0))
     df.delete("Sparse")
     val fileName = "/tmp/exp123.csv"
     FileUtils.removeAll(fileName)

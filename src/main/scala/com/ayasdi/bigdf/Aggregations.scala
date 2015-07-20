@@ -60,7 +60,7 @@ case class SparseSum(child: Expression) extends AggregateExpression {
 
   override def dataType = child.dataType
 
-  override def toString = s"SparseSum($child)"
+  override def toString = s"SparseSum[$child]"
 
   override def newInstance() = SparseSumFunction(child, this)
 }
