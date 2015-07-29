@@ -52,11 +52,11 @@ object SchemaUtils {
    * only materializes the first few rows of first partition, hence faster
    */
   def guessTypeByFirstFew(samples: Array[String], opts: RealNumberParsingOpts): ColType.EnumVal = {
-    val parseFailCount = samples.filter { str =>
+    val parseFailCount = samples.count { str =>
       Try {
         parseDouble(str, opts)
-      }.toOption == None
-    }.length
+      }.toOption.isEmpty
+    }
 
     if (parseFailCount > 0)
       ColType.String

@@ -22,14 +22,14 @@ import com.databricks.spark.csv.{LineExceptionPolicy, LineParsingOpts}
 class DFTest extends FunSuite with BeforeAndAfterAll {
   implicit var sc: SparkContext = _
 
-  override def beforeAll: Unit = {
-    SparkUtil.silenceSpark
+  override def beforeAll(): Unit = {
+    SparkUtil.silenceSpark()
     System.clearProperty("spark.master.port")
     sc = new SparkContext("local[4]", "DFTest")
   }
 
-  override def afterAll: Unit = {
-    sc.stop
+  override def afterAll(): Unit = {
+    sc.stop()
   }
 
   private[bigdf] def makeDF = {
@@ -81,10 +81,6 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     DF(sc, file, options)
   }
 
-  private[bigdf] def makeDFFromCSVFile2(file: String, options: Options = Options()) = {
-    DF(sc, file, options)
-  }
-
   test("Construct: DF from Vector") {
     val df = makeDF
     assert(df.columnCount === 4)
@@ -102,10 +98,6 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
       ("Customer", ColType.String),
       ("Feature1", ColType.Double),
       ("Feature2", ColType.Double)))
-
-    val df2 = makeDFFromCSVFile2("src/test/resources/pivot.csv")
-    assert(df2.columnCount === 4)
-    assert(df2.rowCount === 4)
   }
 
   test("Construct: DF from CSV file with missing fields, fill policy") {
@@ -210,16 +202,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Parsing: Parse mixed doubles") {
-    //FIXME: pass options to parser
-    //    val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
-    //    val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
-    //    df.nameToColumn.foreach { col =>
-    //      col._2.colType match {
-    //        case ColType.Double => col._2.doubleRdd.collect
-    //        case _ => null
-    //      }
-    //    }
-    //    assert(df("Feature1").parseErrors.value === 1)
+    val options = Options(schemaGuessingOpts = SchemaGuessingOpts(fastSamplingSize = 3))
+    val df = makeDFFromCSVFile("src/test/resources/mixedDoubles.csv", options)
+    df.list()
+    assert(df.rowCount === 3)
   }
 
   test("Delete a column") {
@@ -236,14 +222,10 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
   }
 
   test("Parse doubles") {
-    //    val df = DF(sc, "src/test/resources/doubles.csv", ',', 0, Options())
-    //    assert(df("F1").isDouble)
-    //    val parsed = df("F2").doubleRdd.collect()
-    //    println(parsed.mkString(", "))
-    //    assert(List(0, 2, 3, 4, 5, 6).forall {
-    //      parsed(_).isNaN
-    //    })
-    //    assert(parsed(1) === 2.1)
+    val df = DF.fromCSVFile(sc, "src/test/resources/doubles.csv")
+    assert(df("F1").isDouble)
+    df.list()
+    assert(df("F2").countNA === 4)
   }
 
   test("Schema Dictate") {
@@ -639,15 +621,6 @@ case class MyMinFunction(expr: Expression, base: AggregateExpression) extends Ag
   }
 
   override def eval(input: Row): Any = currentMin.value
-}
-
-
-case object TestFunctions {
-  def summer(cols: Array[Any]) = {
-    (cols(0), cols(1)) match {
-      case (a: Double, b: Double) => a + b
-    }
-  }
 }
 
 case object TestFunctions2 {

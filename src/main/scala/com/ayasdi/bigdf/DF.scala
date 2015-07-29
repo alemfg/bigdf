@@ -19,7 +19,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column => SColumn, Row, _}
 import com.ayasdi.bigdf.ColType.EnumVal
-import com.databricks.spark.csv.{CsvParser => SParser, CsvSchemaRDD, CSVParsingOpts}
+import com.databricks.spark.csv.{CSVParsingOpts, CsvParser => SParser, CsvSchemaRDD}
 
 /**
  * A DF is a "list of vectors of equal length". It is a 2-dimensional tabular
@@ -464,6 +464,7 @@ object DF {
       .withCsvParsingOpts(options.csvParsingOpts)
       .withLineParsingOpts(options.lineParsingOpts)
       .withRealNumberParsingOpts(options.realNumberParsingOpts)
+      .withIntNumberParsingOpts(options.intNumberParsingOpts)
       .withSchema(inferredSchema)
       .withParserLib("UNIVOCITY")
       .csvFile(sqlContext, inFile)
@@ -566,7 +567,7 @@ object DF {
   def compareSchema(a: DF, b: DF) = a.sdf.schema == b.sdf.schema
 
   def union(sc: SparkContext, dfs: List[DF]) = {
-    require(dfs.size > 0)
+    require(dfs.nonEmpty)
     require(dfs.tail.forall { df => compareSchema(dfs.head, df) })
 
     var sdf = dfs.head.sdf
