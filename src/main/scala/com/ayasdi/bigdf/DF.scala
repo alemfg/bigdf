@@ -362,6 +362,18 @@ class DF private(var sdf: DataFrame,
   }
 
   /**
+   * join this with DF with another
+   * @param that another DF
+   * @param expr condition for join e.g. df1("key") == df2("KEY")
+   * @param joinType "inner" only for now
+   */
+  def join(that: DF, expr: SColumn, joinType: String) = {
+    require(joinType == "inner", "Only inner join is supported")
+    new DF(sdf.join(that.sdf, expr), options, s"${this.name}_join_${that.name}")
+  }
+
+
+  /**
    * print upto numRows x numCols elements of the dataframe
    */
   def list(numRows: Int = 10, numCols: Int = 10): Unit = sdf.show(numRows)

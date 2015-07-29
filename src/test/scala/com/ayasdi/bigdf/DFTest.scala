@@ -527,6 +527,11 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df3.list()
     assert(df3.columnCount === 7)
     assert(df3.rowCount === 3)
+
+    val df4 = makeDF
+    df4.rename(Map("a" -> "A"))
+    val df5 = df1.join(df4, df1("a") === df4("A"), "inner")
+    df5.list()
   }
 
   test("Column of Double: Double RDD functions") {
