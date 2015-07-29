@@ -451,7 +451,7 @@ object DF {
     val sdf = new SParser().withUseHeader(true)
       .withCsvParsingOpts(options.csvParsingOpts)
       .withLineParsingOpts(options.lineParsingOpts)
-      .withNumberParsingOpts(options.numberParsingOpts)
+      .withRealNumberParsingOpts(options.realNumberParsingOpts)
       .withSchema(inferredSchema)
       .withParserLib("UNIVOCITY")
       .csvFile(sqlContext, inFile)

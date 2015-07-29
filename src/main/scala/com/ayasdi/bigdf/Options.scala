@@ -5,7 +5,7 @@
  */
 package com.ayasdi.bigdf
 
-import com.databricks.spark.csv.{CSVParsingOpts, LineParsingOpts, NumberParsingOpts, StringParsingOpts}
+import com.databricks.spark.csv._
 
 /**
  * Schema inference options
@@ -21,14 +21,15 @@ case class ParquetOpts(binaryAsString: Boolean = true)
 
 /**
  * bigdf configurable options with default values
- * @param numberParsingOpts options to control parsing of numbers
+ * @param realNumberParsingOpts options to control parsing of numbers
  * @param stringParsingOpts options to control parsing of strings
  * @param lineParsingOpts options to handle exceptions while parsing a line
  * @param csvParsingOpts options to control the CSV parser
  * @param schemaGuessingOpts schema guessing options
  * @param perfTuningOpts options to tune performance
  */
-case class Options(numberParsingOpts: NumberParsingOpts = NumberParsingOpts(),
+case class Options(realNumberParsingOpts: RealNumberParsingOpts = RealNumberParsingOpts(),
+                   intNumberParsingOpts: IntNumberParsingOpts = IntNumberParsingOpts(),
                    stringParsingOpts: StringParsingOpts = StringParsingOpts(),
                    lineParsingOpts: LineParsingOpts = LineParsingOpts(),
                    csvParsingOpts: CSVParsingOpts = CSVParsingOpts(),
