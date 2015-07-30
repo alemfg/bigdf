@@ -234,6 +234,23 @@ class DFTest extends FunSuite with BeforeAndAfterAll {
     df.list()
   }
 
+  test("Options from text") {
+    val optMap = Map("stringParsingOpts.emptyStringReplace" -> "emp",
+      "parquetOpts.binaryAsString" -> "false",
+      "perfTuningOpts.cache" -> "true",
+      "schemaGuessingOpts.fastSamplingSize" -> "13",
+      "csvParsingOpts.delimiter" -> "|"
+    )
+
+    val opts = Options(optMap)
+
+    assert(opts.csvParsingOpts.delimiter === '|')
+    assert(opts.perfTuningOpts.cache === true)
+    assert(opts.schemaGuessingOpts.fastSamplingSize === 13)
+    assert(opts.parquetOpts.binaryAsString === false)
+    assert(opts.stringParsingOpts.emptyStringReplace === "emp")
+  }
+
   test("Double to Categorical") {
     //    val df = makeDF
     //    val nCols = df.columnCount
