@@ -6,7 +6,7 @@ DataFrames are useful constructs for data scientists, popularized by [R] and [pa
 [https://github.com/AyasdiOpenSource/spark]:https://github.com/AyasdiOpenSource/spark
 Implementations of these packages are not natively distributed - their DataFrames struggle with big data. bigdf is a dataframe on top of Apache Spark. It is written as an internal Scala DSL with the look and feel of Pandas to make it easy for those familiar with Pandas to use it.
 
-A gentle introduction is available at:
+A gentle(but outdated) introduction is available at:
 > http://www.slideshare.net/codeninja4086/df-38948475?utm_source=slideshow03&utm_medium=ssemail&utm_campaign=iupload_share_slideshow
 
 
@@ -15,9 +15,8 @@ A gentle introduction is available at:
 ```sh
 export $REPOS = ~/Documents/repos
 ```
-- Install maven, scala and sbt (brew instructions below)
+- Install scala and sbt (brew instructions below)
 ```sh
-$ brew install maven
 $ brew install scala
 $ brew install sbt
 ```
@@ -30,9 +29,8 @@ $ git clone git@bitbucket.org:ayasdi/bigdf.git
 ```sh
 $ cd bigdf
 $ sbt update
-$ sbt package
+$ sbt test
 $ sbt assembly
-$ sbt test #this might fail, but will pass from eclipse and intellij
 ```
 - Start a shell and begin playing. You need spark 1.3.1
 ```sh
@@ -40,7 +38,7 @@ $ cd $REPOS
 $ ./spark/bin/spark-shell --jars ./bigdf/target/scala-2.10/bigdf-assembly-*.jar 
 ```
 - https://github.com/AyasdiOpenSource/bigdf/wiki/ for examples
-- Look at DFTest.scala for usage [a simple example is shown below]
+- Look at DFTest.scala for usage
 
 ### Use with ipython notebook
 ```sh
@@ -70,6 +68,7 @@ $ipython notebook --profile scala
 
 To install spark and bigdf to your local mvn repos
 ```sh
+$brew install maven
 $mvn install:install-file -Dfile=$REPOS/bigdf-transforms/lib/spark-assembly-1.2.0-SNAPSHOT-hadoop1.0.4.jar -DgroupId=org.apache -DartifactId=spark-assembly_2.10 -Dversion=1.2.0-SNAPSHOT-hadoop1.0.4 -Dpackaging=jar
 $ mvn install:install-file -Dfile=$REPOS/bigdf-transforms/bigdf/target/scala-2.10/bigdf-assembly-0.2.jar -DgroupId=com.ayasdi -DartifactId=bigdf-assembly_2.10 -Dversion=0.2 -Dpackaging=jar
 ```
