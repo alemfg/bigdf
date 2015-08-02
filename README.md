@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/AyasdiOpenSource/bigdf.svg?branch=master)](https://travis-ci.org/AyasdiOpenSource/bigdf)
-
 ### Introduction
 DataFrames are useful constructs for data scientists, popularized by [R] and [pandas].
 
@@ -35,12 +33,11 @@ $ sbt update
 $ sbt package
 $ sbt assembly
 $ sbt test #this might fail, but will pass from eclipse and intellij
-
 ```
 - Start a shell and begin playing. You need spark 1.3.1
 ```sh
 $ cd $REPOS
-$ ./spark/bin/spark-shell --jars ./bigdf/target/scala-2.10/bigdf-assembly-*.jar
+$ ./spark/bin/spark-shell --jars ./bigdf/target/scala-2.10/bigdf-assembly-*.jar 
 ```
 - https://github.com/AyasdiOpenSource/bigdf/wiki/ for examples
 - Look at DFTest.scala for usage [a simple example is shown below]

@@ -5,9 +5,13 @@
  */
 package com.ayasdi.bigdf
 
-import org.apache.spark.rdd.RDD
+import java.util.{HashMap => JHashMap}
+
 import scala.reflect.ClassTag
+import scala.reflect.runtime.{universe => ru}
+
 import org.apache.spark.ZipImplicits._
+import org.apache.spark.rdd.RDD
 
 /**
  * Efficient methods to zip columns into rows or partial rows using RDDtoZipRDDFunctions
@@ -16,57 +20,30 @@ import org.apache.spark.ZipImplicits._
  * object(one per partition) is used and only the result of desired processing is instantiated in bulk
  */
 private[bigdf] object ColumnZipper {
-  /**
-   * zip columns to get rows as lists
-   * @param df
-   * @param indices
-   * @return
-   */
-  def makeList(df: DF, indices: Seq[Int]) = {
-    val arrays = makeRows(df, indices)
-    arrays.map {
-      _.toList
-    }
-  }
-
-  /**
-   * zip columns to get rows as arrays
-   * @param df
-   * @param indices
-   * @return RDD of columns zipped into Arrays
-   */
-  def makeRows(df: DF, indices: Seq[Int]): RDD[Array[Any]] = {
-    val cols = indices.map { colIndex => df.nameToColumn(df.indexToColumnName(colIndex))}
-    makeRows(cols)
-  }
 
   /**
    * zip columns to get rows as arrays
    * @param cols
    * @return RDD of columns zipped into Arrays
    */
-  def makeRows(cols: Seq[Column[Any]]): RDD[Array[Any]] = {
-    val first = cols.head.rdd
-    val rest = cols.tail.map {
-      _.rdd
-    }
+  def makeRows(cols: Seq[RDD[Any]]): RDD[Array[Any]] = {
+    val first = cols.head
+    val rest = cols.tail
 
-   RDDtoZipRDDFunctions(first).zip(rest)
+    RDDtoZipRDDFunctions(first).zip(rest)
   }
 
   /**
    * zip columns and apply mapper to zipped object
    */
-  def zipAndMap[U: ClassTag](cols: Seq[Column[Any]])(mapper: Array[Any] => U): RDD[U] = {
-    val first = cols.head.rdd
-    val rest = cols.tail.map {
-      _.rdd
-    }
+  def zipAndMap[U: ClassTag](cols: Seq[RDD[Any]])(mapper: Array[Any] => U): RDD[U] = {
+    val first = cols.head
+    val rest = cols.tail
 
     RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
       val temp = new Array[Any](iterSeq.length)
       new Iterator[U] {
-        def hasNext = !iterSeq.exists(!_.hasNext)  //FIXME: catch exception instead and make this faster
+        def hasNext = !iterSeq.exists(!_.hasNext) //FIXME: catch exception instead and make this faster
 
         def next = {
           var i = 0
@@ -75,6 +52,43 @@ private[bigdf] object ColumnZipper {
             i += 1
           }
           mapper(temp)
+        }
+      }
+    }
+  }
+
+  /**
+   * zip columns and apply mapper to zipped object
+   */
+  def zipAndFilter(cols: Seq[RDD[Any]])(matcher: Array[Any] => Boolean): RDD[Boolean] = {
+    val first = cols.head
+    val rest = cols.tail
+
+    RDDtoZipRDDFunctions(first).zipPartitions(rest, false) { iterSeq: Seq[Iterator[Any]] =>
+      val temp = new Array[Any](iterSeq.length)
+      new Iterator[Boolean] {
+        var validNextOne = false
+        var nextOne = false
+        def hasNext = if(!iterSeq.exists(!_.hasNext)) {
+          false
+        } else {
+          while(!nextOne) tryNext
+          true
+        } //FIXME: catch exception instead and make this faster
+
+        def tryNext = {
+          var i = 0
+          iterSeq.foreach { iter =>
+            temp(i) = iter.next
+            i += 1
+          }
+          nextOne = matcher(temp)
+        }
+
+        def next = {
+          val thisOne = nextOne
+          while(!nextOne) tryNext
+          thisOne
         }
       }
     }
@@ -99,7 +113,8 @@ private[bigdf] object ColumnZipper {
         }
 
         def next() = if (hasNext) {
-          hdDefined = false; hd
+          hdDefined = false;
+          hd
         } else throw new NoSuchElementException("next on empty iterator")
       }
     }
