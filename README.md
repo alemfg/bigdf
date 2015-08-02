@@ -32,7 +32,7 @@ $ sbt update
 $ sbt test
 $ sbt assembly
 ```
-- Start a shell and begin playing. You need spark 1.3.1
+- Start a shell and begin playing. You need spark 1.4.x
 ```sh
 $ cd $REPOS
 $ ./spark/bin/spark-shell --jars ./bigdf/target/scala-2.10/bigdf-assembly-*.jar 
