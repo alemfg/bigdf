@@ -60,3 +60,8 @@ lazy val bigdf = project.in(file("."))
 
 lazy val sparkCsv = project in file("spark-csv")
 
+spName := "ayasdi/bigdf"
+
+sparkVersion := "1.4.0"
+
+sparkComponents += "sql"
