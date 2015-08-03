@@ -78,7 +78,7 @@ class SparseColumnSet(self: Column) {
   }
 }
 
-case class AggDistinctKeys[T: ru.TypeTag] {
+case class AggDistinctKeys[T: ru.TypeTag]() {
   def zeroVal: mutable.Set[String] = new JHashSet[String]
 
   def seqOp(a: mutable.Set[String], b: Map[String, T]) = a ++= b.keySet

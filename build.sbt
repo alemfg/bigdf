@@ -2,7 +2,7 @@ name := "bigdf"
 
 version := "2.0-SNAPSHOT"
 
-scalaVersion := "2.10.4"
+scalaVersion := "2.11.6"
 
 parallelExecution in Test := false
 
@@ -10,7 +10,7 @@ libraryDependencies ++= Seq(
   "com.univocity" % "univocity-parsers" % "1.5.1"
 )
 
-libraryDependencies += "org.scalatest" % "scalatest_2.10" % "2.0" % Test
+libraryDependencies += "org.scalatest" %% "scalatest" % "2.2.4" % Test
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "1.4.0" % Provided
 

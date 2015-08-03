@@ -1,5 +1,7 @@
 scalaVersion := "2.10.4"
 
+resolvers += Resolver.url("scoverage-bintray", url("https://dl.bintray.com/sksamuel/sbt-plugins/"))(Resolver.ivyStylePatterns)
+
 resolvers += Resolver.url("artifactory", url("http://scalasbt.artifactoryonline.com/scalasbt/sbt-plugin-releases"))(Resolver.ivyStylePatterns)
 
 resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/"
@@ -27,6 +29,8 @@ addSbtPlugin("com.eed3si9n" % "sbt-unidoc" % "0.3.1")
 addSbtPlugin("com.typesafe.sbt" % "sbt-pgp" % "0.8")
 
 addSbtPlugin("org.scalastyle" %% "scalastyle-sbt-plugin" % "0.6.0")
+
+addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.1.0")
 
 libraryDependencies += "org.ow2.asm"  % "asm" % "5.0.3"
 

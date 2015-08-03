@@ -154,13 +154,6 @@ class DF private(var sdf: DataFrame,
   }
 
   /**
-   * get a column with given index
-   * @param index column index
-   * @return
-   */
-  def apply(index: Int): Column[Any] = nameToColumn(indexToColumnName(index))
-
-  /**
    * get multiple columns by name, indices or index ranges
    * e.g. myDF("x", "y")
    * or   myDF(0, 1, 6)
