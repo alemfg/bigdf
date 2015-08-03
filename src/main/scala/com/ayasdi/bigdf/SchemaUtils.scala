@@ -98,9 +98,7 @@ object SchemaUtils {
     ).parseLine(firstLine)
     println(s"Found ${header.size} columns in header")
 
-    val dataLines = file.mapPartitionsWithIndex({
-      case (partitionIndex, iter) => if (partitionIndex == 0) iter.drop(1) else iter
-    }, true)
+    val dataLines = file.filter(_ != firstLine)
 
     val rows = dataLines.mapPartitionsWithIndex({
       case (split, iter) =>
